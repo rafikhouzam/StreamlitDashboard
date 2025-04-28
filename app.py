@@ -19,7 +19,7 @@ customer_names = {
 customer_codes = list(customer_names.keys())
 customer_selected = st.sidebar.selectbox('Select Customer', customer_codes)
 
-# Filtered DataFrame
+# Filter DataFrame
 df_filtered = df_master[df_master['Customer'] == customer_selected]
 
 # KPIs
@@ -28,9 +28,8 @@ st.title(f"{customer_names[customer_selected]} Dashboard")
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Sales", f"${df_filtered['sales_amt'].sum():,.0f}")
 col2.metric("Units Sold", f"{df_filtered['sales_qty'].sum():,.0f}")
-col3.metric("Profit", f"{df_filtered['profit'].sum():,.0f}",'%')
-
-# Visualization Section 1: Performance by Style Category
+col3.metric("Profit", f"{df_filtered['profit'].sum():,.0f}%")
+# --- Visualization 1: Performance by Style Category
 st.subheader("Performance by Style Category")
 
 category_summary = df_filtered.groupby(['style_category', 'Performance_Category']).size().unstack(fill_value=0)
@@ -43,7 +42,7 @@ ax1.set_xlabel("Style Category")
 ax1.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.7)
 st.pyplot(fig1)
 
-# Visualization Section 2: Overall Performance
+# --- Visualization 2: Overall Style Performance
 st.subheader("Overall Style Performance")
 
 category_counts = df_filtered['Performance_Category'].value_counts().sort_values(ascending=True)
@@ -55,3 +54,31 @@ ax2.set_ylabel("Number of Styles")
 ax2.set_xlabel("Performance Category")
 ax2.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
 st.pyplot(fig2)
+
+# --- Table 1: Potential Stockouts
+st.subheader("⚡ Potential Stockouts (High Risk)")
+
+stockouts = df_filtered[
+    (df_filtered['Total_Qty'] <= 3) & (df_filtered['sales_qty'] >= 5)
+]
+
+st.dataframe(stockouts[['Item_id', 'style_category', 'sales_qty', 'Total_Qty']])
+
+# --- Table 2: Deadweight Inventory
+st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales)")
+
+deadweight = df_filtered[
+    (df_filtered['Total_Qty'] >= 5) & (df_filtered['sales_qty'] <= 1)
+]
+
+st.dataframe(deadweight[['Item_id', 'style_category', 'sales_qty', 'Total_Qty']])
+
+# --- BONUS: Download Button
+st.subheader("⬇️ Download Customer Data")
+
+st.download_button(
+    label="Download Filtered Customer CSV",
+    data=df_filtered.to_csv(index=False),
+    file_name=f'{customer_selected}_filtered_data.csv',
+    mime='text/csv'
+)
