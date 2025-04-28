@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load the master cleaned dataset
-df_master = pd.read_csv('Complete_Cleaned_Ecomm.csv')
+# Load the merged cleaned dataset (AFTER truth inventory merge)
+df_master = pd.read_csv('Updated_Complete.csv')
 
 # Sidebar - Customer selection
 customer_names = {
@@ -22,13 +22,14 @@ customer_selected = st.sidebar.selectbox('Select Customer', customer_codes)
 # Filter DataFrame
 df_filtered = df_master[df_master['Customer'] == customer_selected]
 
-# KPIs
+# ---------------- KPIs ----------------
 st.title(f"{customer_names[customer_selected]} Dashboard")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Sales", f"${df_filtered['sales_amt'].sum():,.0f}")
 col2.metric("Units Sold", f"{df_filtered['sales_qty'].sum():,.0f}")
 col3.metric("Profit", f"{df_filtered['profit'].sum():,.0f}%")
+
 # --- Visualization 1: Performance by Style Category
 st.subheader("Performance by Style Category")
 
@@ -55,23 +56,35 @@ ax2.set_xlabel("Performance Category")
 ax2.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
 st.pyplot(fig2)
 
-# --- Table 1: Potential Stockouts
-st.subheader("⚡ Potential Stockouts (High Risk)")
+# ---------------- Inventory Health ----------------
+
+# ⚡ Potential Stockouts (based on real OnHand)
+st.subheader("⚡ Potential Stockouts (High Opportunity) (Updated with Real Inventory)")
 
 stockouts = df_filtered[
-    (df_filtered['Total_Qty'] <= 3) & (df_filtered['sales_qty'] >= 5)
+    (df_filtered['onhand'] <= 3) & (df_filtered['sales_qty'] >= 5)
 ]
 
-st.dataframe(stockouts[['Item_id', 'style_category', 'sales_qty', 'Total_Qty']])
+st.dataframe(stockouts[['Item_id', 'style_category', 'sales_qty', 'onhand']])
 
-# --- Table 2: Deadweight Inventory
-st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales)")
+# ❄️ Deadweight Inventory (using real OnHand)
+st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales) (Updated with Real Inventory)")
 
 deadweight = df_filtered[
-    (df_filtered['Total_Qty'] >= 5) & (df_filtered['sales_qty'] <= 1)
+    (df_filtered['onhand'] >= 5) & (df_filtered['sales_qty'] <= 1)
 ]
 
-st.dataframe(deadweight[['Item_id', 'style_category', 'sales_qty', 'Total_Qty']])
+st.dataframe(deadweight[['Item_id', 'style_category', 'sales_qty', 'onhand']])
+
+# 🚨 Inventory Discrepancy Check
+st.subheader("🚨 Inventory Discrepancy Check (Internal vs True)")
+
+# Add inventory difference calculation
+df_filtered['Inventory_Difference'] = df_filtered['Total_Qty'] - df_filtered['onhand']
+
+discrepancies = df_filtered[df_filtered['Inventory_Difference'].abs() >= 3]
+
+st.dataframe(discrepancies[['Item_id', 'style_category', 'Total_Qty', 'onhand', 'Inventory_Difference']])
 
 # --- BONUS: Download Button
 st.subheader("⬇️ Download Customer Data")
