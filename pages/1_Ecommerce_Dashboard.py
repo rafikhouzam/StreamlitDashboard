@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
+st.set_page_config(
+    page_title="Ecommerce Dashboard",
+    page_icon="📦",
+    layout="wide"
+)
+
 # Load the merged cleaned dataset (AFTER truth inventory merge)
 df_master = pd.read_csv('Updated_Complete_1.1.csv')
 

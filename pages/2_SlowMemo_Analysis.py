@@ -1,70 +1,101 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
+from streamlit_pills import pills
 
 # Page config
-st.set_page_config(page_title="Slow Moving Memo Analysis", layout="wide")
 
-# Title
+st.set_page_config(
+    page_title="Slow Moving Memo",
+    page_icon="🪙",
+    layout="wide"
+)
 st.title("🪙 Slow Moving Memo Analysis (2024–2025)")
 
-# Load cleaned dataset
+# Load dataset
 @st.cache_data
 def load_data():
     return pd.read_csv("Cleaned_SlowMemo_2024_2025.csv")
 
 df = load_data()
 
-# Sidebar filters
+# === Sidebar Filters ===
 st.sidebar.header("Filters")
-ae_selected = st.sidebar.multiselect('Account Executive(s)', options=df['AE'].unique())
-customer_selected = st.sidebar.multiselect('Customer(s)', options=df['Customer'].unique())
 
+# Filter: Account Executive
+ae_selected = st.sidebar.multiselect("Account Executive(s)", df["AE"].unique())
 if ae_selected:
-    df = df[df['AE'].isin(ae_selected)]
-if customer_selected:
-    df = df[df['Customer'].isin(customer_selected)]
+    df = df[df["AE"].isin(ae_selected)]
 
-# KPIs
+# Filter: Customer
+customer_selected = st.sidebar.multiselect("Customer(s)", df["Customer"].unique())
+if customer_selected:
+    df = df[df["Customer"].isin(customer_selected)]
+
+# ✅ NEW: Filter by Metal
+metal_selected = st.sidebar.multiselect("Metal Type(s)", df["Metal Kt"].unique())
+if metal_selected:
+    df = df[df["Metal Kt"].isin(metal_selected)]
+
+# === KPI Display ===
 st.subheader("🔢 Key Metrics")
-total_styles = len(df)
-dead_weight = (df['Performance_Category'] == 'Dead Weight').sum()
-slow_movers = (df['Performance_Category'] == 'Slow Mover').sum()
-strong_sellers = (df['Performance_Category'] == 'Strong Seller').sum()
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Styles", f"{total_styles:,}")
-col2.metric("Dead Weight", f"{dead_weight:,}")
-col3.metric("Slow Movers", f"{slow_movers:,}")
-col4.metric("Strong Sellers", f"{strong_sellers:,}")
+col1.metric("Total Styles", f"{len(df):,}")
+col2.metric("Dead Weight", f"{(df['Performance_Category'] == 'Dead Weight').sum():,}")
+col3.metric("Slow Movers", f"{(df['Performance_Category'] == 'Slow Mover').sum():,}")
+col4.metric("Strong Sellers", f"{(df['Performance_Category'] == 'Strong Seller').sum():,}")
 
-# Category breakdown chart
-st.subheader("📊 Performance Category Breakdown")
-category_counts = df['Performance_Category'].value_counts()
-fig, ax = plt.subplots()
-category_counts.plot(kind='barh', ax=ax, color=['#d62728', '#ff7f0e', '#1f77b4', '#2ca02c'])
-ax.set_xlabel("Number of Styles")
-ax.set_ylabel("Category")
-ax.set_title("Performance Distribution")
-st.pyplot(fig)
+# === Display Sorted Table ===
+st.subheader("📋 Detailed Memo Table (Sorted)")
 
-# Worst memo items
-st.subheader("💀 Top 10 Worst Memo Styles (by $ value)")
-worst_memos = df[df['Performance_Category'].isin(['Dead Weight', 'Slow Mover'])] \
-    .sort_values(by='Open_Memo_Amt', ascending=False) \
-    .head(10)
+sort_columns = {
+    "Open Memo Qty": "Open_Memo_Qty",
+    "Open Memo Amt ($)": "Open_Memo_Amt",
+    "Net Sales 2025 YTD ($)": "Net_Sales_2025_YTD"
+}
 
-st.dataframe(
-    worst_memos[[
-        'AE', 'Customer', 'Style', 'Style Description', 'Performance_Category',
-        'Open_Memo_Qty', 'Open_Memo_Amt', 'Net_Sales_2025_YTD', 'Expected_Sales_6mo'
-    ]]
+# 🚀 Real pill-style selection
+sort_display = pills(
+    "Sort by Column:",
+    options=list(sort_columns.keys()),
+    index=0,
+    label_visibility="visible"
 )
 
-# Optional: export
+# Map the display label back to the real column
+sort_column = sort_columns[sort_display]
+
+# 🔃 Order selector (still native radio for now)
+sort_order = pills(
+    "Order:",
+    options=["Descending", "Ascending"],
+    index=0,
+    label_visibility="visible"
+)
+ascending = sort_order == "Ascending"
+
+# Sort and display
+df_sorted = df.sort_values(by=sort_column, ascending=ascending)
+
+# Display top rows
+st.dataframe(
+    df_sorted[[
+        "AE", "Customer", "Metal Kt", "Style", "Style Description",
+        "Performance_Category", "Open_Memo_Qty", "Open_Memo_Amt",
+        "Net_Sales_2025_YTD", "Expected_Sales_6mo"
+    ]].style.format({
+        "Open_Memo_Qty": "{:,}",
+        "Open_Memo_Amt": "${:,.2f}",
+        "Net_Sales_2025_YTD": "${:,.2f}",
+        "Expected_Sales_6mo": "{:,}"
+    })
+)
+
+
+# Optional: CSV download
 st.download_button(
-    label="📥 Download Full Dataset (CSV)",
-    data=df.to_csv(index=False),
-    file_name="Full_SlowMemo_Analysis.csv",
+    label="📥 Download Filtered Dataset",
+    data=df_sorted.to_csv(index=False),
+    file_name="Filtered_SlowMemo.csv",
     mime="text/csv"
 )
