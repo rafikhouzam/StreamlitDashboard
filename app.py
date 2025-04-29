@@ -12,6 +12,7 @@ customer_names = {
     'K029': 'Kohls',
     'MA001': 'Macys',
     'QV001': 'QVC',
+    'R2002': 'BlueNile - R2NET',
     'STERLING': 'Kay-Jared-Outlet',
     'Z011': 'Zales'
 }
@@ -59,7 +60,7 @@ st.pyplot(fig2)
 # ---------------- Inventory Health ----------------
 
 # ⚡ Potential Stockouts (based on real OnHand)
-st.subheader("⚡ Potential Stockouts (High Opportunity) (Updated with Real Inventory)")
+st.subheader("⚡ Potential Stockouts (High Opportunity)")
 
 stockouts = df_filtered[
     (df_filtered['onhand'] <= 3) & (df_filtered['sales_qty'] >= 5)
