@@ -78,14 +78,14 @@ deadweight = df_filtered[
 st.dataframe(deadweight[['Item_id', 'style_category', 'sales_qty', 'onhand']])
 
 # 🚨 Inventory Discrepancy Check
-st.subheader("🚨 Inventory Discrepancy Check (Internal vs True)")
+#st.subheader("🚨 Inventory Discrepancy Check (Internal vs True)")
 
 # Add inventory difference calculation
-df_filtered['Inventory_Difference'] = df_filtered['Total_Qty'] - df_filtered['onhand']
+#df_filtered['Inventory_Difference'] = df_filtered['Total_Qty'] - df_filtered['onhand']
 
-discrepancies = df_filtered[df_filtered['Inventory_Difference'].abs() >= 3]
+#discrepancies = df_filtered[df_filtered['Inventory_Difference'].abs() >= 3]
 
-st.dataframe(discrepancies[['Item_id', 'style_category', 'Total_Qty', 'onhand', 'Inventory_Difference']])
+#st.dataframe(discrepancies[['Item_id', 'style_category', 'Total_Qty', 'onhand', 'Inventory_Difference']])
 
 # --- BONUS: Download Button
 st.subheader("⬇️ Download Customer Data")
