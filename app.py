@@ -69,7 +69,7 @@ stockouts = df_filtered[
 st.dataframe(stockouts[['Item_id', 'style_category', 'sales_qty', 'onhand']])
 
 # ❄️ Deadweight Inventory (using real OnHand)
-st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales) (Updated with Real Inventory)")
+st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales)")
 
 deadweight = df_filtered[
     (df_filtered['onhand'] >= 5) & (df_filtered['sales_qty'] <= 1)
