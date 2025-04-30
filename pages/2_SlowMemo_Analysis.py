@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from streamlit_pills import pills
+import requests
 
 # Page config
 
@@ -13,10 +14,19 @@ st.title("🪙 Slow Moving Memo Analysis (2024–2025)")
 
 # Load dataset
 @st.cache_data
-def load_data():
-    return pd.read_csv("Cleaned_SlowMemo_2024_2025.csv")
-
-df = load_data()
+def load_memo():
+    IP = st.secrets["IP"]
+    url = f"http://{IP}:8000/memo"
+    headers = {"X-API-KEY": st.secrets["API_KEY"]}
+    res = requests.get(url, headers=headers)
+    res.raise_for_status()
+    return pd.DataFrame(res.json())
+df = load_memo()
+try:
+    df = load_memo()
+except Exception as e:
+    st.error("❌ Failed to load updated data.")
+    st.text(f"Error: {e}")
 
 # === Sidebar Filters ===
 st.sidebar.header("Filters")

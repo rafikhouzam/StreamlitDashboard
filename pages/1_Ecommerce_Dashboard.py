@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import requests
 
 st.set_page_config(
     page_title="Ecommerce Dashboard",
@@ -8,8 +9,23 @@ st.set_page_config(
     layout="wide"
 )
 
+
+
+@st.cache_data
+def load_updated():
+    IP = st.secrets["IP"]
+    url = f"http://{IP}:8000/updated"
+    headers = {"X-API-KEY": st.secrets["API_KEY"]}
+    res = requests.get(url, headers=headers)
+    res.raise_for_status()
+    return pd.DataFrame(res.json())
+
 # Load the merged cleaned dataset (AFTER truth inventory merge)
-df_master = pd.read_csv('Updated_Complete_1.1.csv')
+try:
+    df_master = load_updated()
+except Exception as e:
+    st.error("❌ Failed to load updated data.")
+    st.text(f"Error: {e}")
 
 # Sidebar - Customer selection
 customer_names = {

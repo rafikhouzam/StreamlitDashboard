@@ -48,7 +48,8 @@ st.info("🚀 Latest Update: Slow Moving Memo Analysis added to the platform!")
 st.markdown("---")
 
 # --- Optional: Centered Footer Text ---
-#st.markdown(
-#    "<p style='text-align: center; color: gray;'>© 2025 Aneri Jewels. All Rights Reserved.</p>",
-#    unsafe_allow_html=True
-#)
+st.markdown(
+    "<p style='text-align: center; color: gray;'>© 2025 Aneri Jewels. All Rights Reserved.</p>",
+    unsafe_allow_html=True
+)
+
