@@ -12,7 +12,7 @@ st.set_page_config(
 @st.cache_data
 def load_updated():
     IP = st.secrets["IP"]
-    url = f"http://{IP}:8000/updated"
+    url = f"http://{IP}/api/updated"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()

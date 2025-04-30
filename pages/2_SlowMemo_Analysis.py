@@ -16,7 +16,7 @@ st.title("🪙 Slow Moving Memo Analysis (2024–2025)")
 @st.cache_data
 def load_memo():
     IP = st.secrets["IP"]
-    url = f"http://{IP}:8000/memo"
+    url = f"http://{IP}/api/memo"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()
