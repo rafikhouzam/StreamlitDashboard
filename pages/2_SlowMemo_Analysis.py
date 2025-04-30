@@ -21,7 +21,7 @@ def load_memo():
     res = requests.get(url, headers=headers)
     res.raise_for_status()
     return pd.DataFrame(res.json())
-df = load_memo()
+
 try:
     df = load_memo()
 except Exception as e:

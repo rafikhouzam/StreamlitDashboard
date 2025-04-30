@@ -18,25 +18,12 @@ def load_updated():
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
-with st.spinner("🔄 Loading memo data..."):
-    df_master = load_updated()
-    df_preview = df_master.head(100)
-
-st.success(f"✅ Loaded {len(df_master)} rows. Showing preview of first 100 rows.")
-
-st.dataframe(df_preview)
-
-if st.button("🔍 Show Full Table"):
-    with st.spinner("Rendering full dataset..."):
-        st.dataframe(df_master)
-
-
 # Load the merged cleaned dataset (AFTER truth inventory merge)
-#try:
- #   df_master = load_updated()
-#except Exception as e:
- #   st.error("❌ Failed to load updated data.")
-  #  st.text(f"Error: {e}")
+try:
+    df_master = load_updated()
+except Exception as e:
+    st.error("❌ Failed to load updated data.")
+    st.text(f"Error: {e}")
 
 # Sidebar - Customer selection
 customer_names = {
