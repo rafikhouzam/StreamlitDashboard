@@ -3,3 +3,4 @@ matplotlib
 streamlit
 streamlit-pills
 requests
+plotly
