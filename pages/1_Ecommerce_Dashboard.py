@@ -75,15 +75,23 @@ st.subheader("Overall Style Performance")
 category_counts = df_filtered['Performance_Category'].value_counts().sort_values(ascending=True)
 
 fig2 = px.bar(
-    category_counts.reset_index(),
-    x='index',
-    y='Performance_Category',
+    category_counts,
+    x=category_counts.index,
+    y=category_counts.values,
+    labels={'x': 'Performance Category', 'y': 'Number of Styles'},
     title=f"{customer_names[customer_selected]} Overall Style Performance",
-    labels={'index': 'Performance Category', 'Performance_Category': 'Number of Styles'},
+    color_discrete_sequence=['teal']
 )
 
-fig2.update_layout(height=450)
+fig2.update_layout(
+    xaxis_title='Performance Category',
+    yaxis_title='Number of Styles',
+    plot_bgcolor='white',
+    grid=dict(yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='lightgray'))
+)
+
 st.plotly_chart(fig2, use_container_width=True)
+
 
 
 # ---------------- Inventory Health ----------------
