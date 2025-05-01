@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import requests
+import plotly.express as px
 
 st.set_page_config(
     page_title="Ecommerce Dashboard",
@@ -56,26 +57,34 @@ st.subheader("Performance by Style Category")
 
 category_summary = df_filtered.groupby(['style_category', 'Performance_Category']).size().unstack(fill_value=0)
 
-fig1, ax1 = plt.subplots(figsize=(12, 6))
-category_summary.plot(kind='bar', stacked=True, ax=ax1)
-ax1.set_title(f"{customer_names[customer_selected]} Performance by Style Category")
-ax1.set_ylabel("Number of Styles")
-ax1.set_xlabel("Style Category")
-ax1.grid(axis='y', linestyle='--', linewidth=0.5, alpha=0.7)
-st.pyplot(fig1)
+fig1 = px.bar(
+    category_summary.reset_index(),
+    x='style_category',
+    y=category_summary.columns.tolist(),
+    title=f"{customer_names[customer_selected]} Performance by Style Category",
+    labels={'value': 'Number of Styles', 'style_category': 'Style Category'},
+)
+
+fig1.update_layout(barmode='stack', height=500)
+st.plotly_chart(fig1, use_container_width=True)
+
 
 # --- Visualization 2: Overall Style Performance
 st.subheader("Overall Style Performance")
 
 category_counts = df_filtered['Performance_Category'].value_counts().sort_values(ascending=True)
 
-fig2, ax2 = plt.subplots(figsize=(8, 5))
-category_counts.plot(kind='bar', ax=ax2, color='teal')
-ax2.set_title(f"{customer_names[customer_selected]} Overall Style Performance")
-ax2.set_ylabel("Number of Styles")
-ax2.set_xlabel("Performance Category")
-ax2.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-st.pyplot(fig2)
+fig2 = px.bar(
+    category_counts.reset_index(),
+    x='index',
+    y='Performance_Category',
+    title=f"{customer_names[customer_selected]} Overall Style Performance",
+    labels={'index': 'Performance Category', 'Performance_Category': 'Number of Styles'},
+)
+
+fig2.update_layout(height=450)
+st.plotly_chart(fig2, use_container_width=True)
+
 
 # ---------------- Inventory Health ----------------
 
