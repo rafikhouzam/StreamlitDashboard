@@ -87,7 +87,8 @@ fig2.update_layout(
     xaxis_title='Performance Category',
     yaxis_title='Number of Styles',
     plot_bgcolor='white',
-    grid=dict(yaxis=dict(showgrid=True, gridwidth=0.5, gridcolor='lightgray'))
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray')
 )
 
 st.plotly_chart(fig2, use_container_width=True)
