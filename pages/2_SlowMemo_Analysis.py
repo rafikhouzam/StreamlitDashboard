@@ -15,8 +15,7 @@ st.title("🪙 Slow Moving Memo Analysis (2024–2025)")
 # Load dataset
 @st.cache_data
 def load_memo():
-    IP = st.secrets["IP"]
-    url = f"http://{IP}/api/memo"
+    url = f"https://api.anerijewels.com/api/memo"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()
@@ -100,7 +99,6 @@ st.dataframe(
         "Expected_Sales_6mo": "{:,}"
     })
 )
-
 
 # Optional: CSV download
 st.download_button(

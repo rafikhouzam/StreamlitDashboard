@@ -13,7 +13,7 @@ st.set_page_config(
 @st.cache_data
 def load_updated():
     IP = st.secrets["IP"]
-    url = f"http://{IP}/api/updated"
+    url = f"https://api.anerijewels.com/api//updated"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()
@@ -23,7 +23,7 @@ def load_updated():
 try:
     df_master = load_updated()
 except Exception as e:
-    st.error("❌ Failed to load updated data.")
+    st.error("❌ Failed to load Ecomm data.")
     st.text(f"Error: {e}")
 
 # Sidebar - Customer selection
