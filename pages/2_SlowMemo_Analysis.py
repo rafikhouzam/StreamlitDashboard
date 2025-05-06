@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from streamlit_pills import pills
 import requests
 
 # Page config
@@ -64,22 +63,22 @@ sort_columns = {
 }
 
 # 🚀 Real pill-style selection
-sort_display = pills(
+sort_display = st.radio(
     "Sort by Column:",
     options=list(sort_columns.keys()),
     index=0,
-    label_visibility="visible"
+    horizontal=True,
 )
 
 # Map the display label back to the real column
 sort_column = sort_columns[sort_display]
 
 # 🔃 Order selector (still native radio for now)
-sort_order = pills(
+sort_order = st.radio(
     "Order:",
     options=["Descending", "Ascending"],
     index=0,
-    label_visibility="visible"
+    horizontal=True,
 )
 ascending = sort_order == "Ascending"
 
