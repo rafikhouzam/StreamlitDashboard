@@ -39,7 +39,8 @@ More dashboards and features are coming soon as we expand the system.
 """)
 
 # --- Highlights / Updates Section ---
-st.info("🚀 Latest Update: Slow Moving Memo Analysis added to the platform!")
+st.info("🚀 Latest Update: Moved to anerijewels domain and upgraded security")
+st.info("💻 In development: Centralized Image Lookup, Asset Customer Analysis")
 
 # Optional: future feature teaser
 # st.warning("📅 Coming Soon: Style Search and Visual Lookup Tool!")
@@ -52,4 +53,3 @@ st.markdown(
     "<p style='text-align: center; color: gray;'>© 2025 Aneri Jewels. All Rights Reserved.</p>",
     unsafe_allow_html=True
 )
-

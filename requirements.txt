@@ -1,7 +1,6 @@
 pandas
 matplotlib
 streamlit
-git+https://github.com/okld/streamlit-pills.git
 requests<2.31
 plotly
 urllib3<2.0
