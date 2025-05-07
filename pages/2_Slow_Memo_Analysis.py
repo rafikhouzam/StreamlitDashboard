@@ -44,6 +44,11 @@ metal_selected = st.sidebar.multiselect("Metal Type(s)", df["Metal Kt"].unique()
 if metal_selected:
     df = df[df["Metal Kt"].isin(metal_selected)]
 
+st.sidebar.markdown(
+    "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
+    unsafe_allow_html=True
+)
+
 # === KPI Display ===
 st.subheader("🔢 Key Metrics")
 

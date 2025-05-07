@@ -14,7 +14,7 @@ st.set_page_config(
 # Optional: Add a logo if you have one
 # st.image("your_logo.png", width=300)
 st.sidebar.markdown(
-    "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels</h2>",
+    "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
     unsafe_allow_html=True
 )
 

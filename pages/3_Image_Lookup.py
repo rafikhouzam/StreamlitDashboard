@@ -17,6 +17,10 @@ Soon, you'll be able to:
 
 Thanks for your patience!
 """)
+st.sidebar.markdown(
+    "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
+    unsafe_allow_html=True
+)
 
 # Disabled input fields and button
 st.text_input(
