@@ -73,6 +73,6 @@ else:
     cols = st.columns(4)
     for i, (_, row) in enumerate(page_df.iterrows()):
         with cols[i % 4]:
-            st.image(row["full_path"], use_container_width=True)
+            st.image(row["full_path"], use_column_width=True)
             st.markdown(f"**{row['style_cd']}**")
             st.caption(f"{row.get('style_category', '')} | {row.get('cstone_shape', '')} | {row.get('metal_color', '')}")
