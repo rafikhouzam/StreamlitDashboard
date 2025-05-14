@@ -13,7 +13,7 @@ st.title("🔎 Image Lookup")
 # === Load Data ===
 @st.cache_data
 def load_metadata():
-    url = "https://api.anerijewels.com/api/metadata_1_8"
+    url = "https://api.anerijewels.com/api/metadata"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()
