@@ -112,6 +112,6 @@ st.write(f"**Found {len(grouped_df)} matching visuals**")
 cols = st.columns(4)
 for i, row in page_df.iterrows():
     with cols[i % 4]:
-        st.image(row["image_url"], use_container_width=True)
+        st.image(row["image_url"], use_column_width=True)
         st.markdown("**Styles:**<br>" + "<br>".join(row["style_cd"]), unsafe_allow_html=True)
         st.caption(f"{' / '.join(row['style_category'])} | {' / '.join(row['cstone_shape'])} | {' / '.join(row['metal_color'])}")
