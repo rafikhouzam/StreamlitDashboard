@@ -39,8 +39,9 @@ More dashboards and features are coming soon as we expand the system.
 """)
 
 # --- Highlights / Updates Section ---
-st.info("🚀 Latest Update: Moved to anerijewels domain and upgraded security")
-st.info("💻 In development: Centralized Image Lookup, Asset Customer Analysis")
+st.info("🚀 Latest Update: Fully operational Image Lookup")
+st.info("💻 In development: Similarity Search based on Image Upload")
+st.info("For any questions or development suggestions, feel free to email me at rafi@anerijewels.com")
 
 # Optional: future feature teaser
 # st.warning("📅 Coming Soon: Style Search and Visual Lookup Tool!")
