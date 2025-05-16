@@ -67,6 +67,11 @@ collection = st.sidebar.selectbox("Collection", [""] + sorted(df["collection"].d
 metal_color = st.sidebar.selectbox("Metal Color", [""] + sorted(df["metal_color"].dropna().unique()))
 cstone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["cstone_shape"].dropna().unique()))
 
+st.sidebar.markdown(
+    "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
+    unsafe_allow_html=True
+)
+
 # === Step 1: Apply search and filters ===
 filtered_df = df.copy()
 
@@ -100,7 +105,7 @@ filtered_df.loc[filtered_df["visual_id"] == "", "visual_id"] = pd.NA
 
 
 # === Step 3: Group SUMIT rows by visual_id, keep SAMPL rows as-is
-has_visual = (filtered_df['source'] != 'SAMPL')  # True only for SUMIT rows
+has_visual = filtered_df["visual_id"].notna()
 
 grouped_sumit = (
     filtered_df[has_visual]
@@ -131,38 +136,42 @@ grouped_sampl = (
 )
 
 grouped_df = pd.concat([grouped_sumit, grouped_sampl], ignore_index=True)
-
+grouped_df["sort_key"] = grouped_df["style_cd"].apply(lambda x: sorted(x)[0] if isinstance(x, list) and x else "")
+grouped_df = grouped_df.sort_values("sort_key").reset_index(drop=True)
 
 
 # === Step 4: Pagination
-PAGE_SIZE = 24
-total_pages = (len(grouped_df) - 1) // PAGE_SIZE + 1
-page_num = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
-start_idx = (page_num - 1) * PAGE_SIZE
-end_idx = start_idx + PAGE_SIZE
-page_df = grouped_df.iloc[start_idx:end_idx]
+if len(grouped_df) > 0:
+    PAGE_SIZE = 24
+    total_pages = (len(grouped_df) - 1) // PAGE_SIZE + 1
+    page_num = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
+    start_idx = (page_num - 1) * PAGE_SIZE
+    end_idx = start_idx + PAGE_SIZE
+    page_df = grouped_df.iloc[start_idx:end_idx]
 
-# === Step 5: Display results
-st.write(f"**Found {len(grouped_df)} matching visuals**")
+    # === Step 5: Display results
+    st.write(f"**Found {len(grouped_df)} matching visuals**")
 
-def to_multiline(val):
-    if isinstance(val, list):
-        return "<br>".join(val)
-    return val
+    def to_multiline(val):
+        if isinstance(val, list):
+            return "<br>".join(val)
+        return val
 
-def to_slash(val):
-    if isinstance(val, list):
-        return " / ".join(val)
-    return val
+    def to_slash(val):
+        if isinstance(val, list):
+            return " / ".join(val)
+        return val
 
-cols = st.columns(4)
-for i, row in page_df.iterrows():
-    with cols[i % 4]:
-        st.markdown(f'''
-            <div class="image-box">
-                <img src="{row["image_url"]}" alt="Style image">
-            </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
-        st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
+    cols = st.columns(4)
+    for i, row in page_df.iterrows():
+        with cols[i % 4]:
+            st.markdown(f'''
+                <div class="image-box">
+                    <img src="{row["image_url"]}" alt="Style image">
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
+            st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
+else:
+    st.warning(f"No results found for **{search_query}**. Try a different search.")
