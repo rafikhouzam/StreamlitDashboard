@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
+import inspect
 
 st.set_page_config(
     page_title="Image Lookup",
@@ -9,6 +10,28 @@ st.set_page_config(
 )
 
 st.title("🔎 Image Lookup")
+
+st.markdown("""
+    <style>
+    .image-box {
+        width: 200px;
+        height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: auto;
+    }
+
+    .image-box img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 
 # === Load Data ===
 @st.cache_data
@@ -20,6 +43,18 @@ def load_metadata():
     return pd.DataFrame(res.json())
 
 df = load_metadata()
+# Drop rows where visual_id is missing or empty string
+#df = df[df["visual_id"].notna() & (df["visual_id"] != "")]
+
+
+def safe_image(image_url, caption=None, width=250, height=250):
+    sig = inspect.signature(st.image).parameters
+    if "use_container_width" in sig:
+        st.image(image_url, caption=caption, use_container_width=True)
+    elif "use_column_width" in sig:
+        st.image(image_url, caption=caption, use_column_width=True)
+    else:
+        st.image(image_url, caption=caption, width=width, height=height)
 
 # === Search Bar ===
 search_query = st.text_input("Search by Style Number or Description")
@@ -109,9 +144,25 @@ page_df = grouped_df.iloc[start_idx:end_idx]
 
 # === Step 5: Display results
 st.write(f"**Found {len(grouped_df)} matching visuals**")
+
+def to_multiline(val):
+    if isinstance(val, list):
+        return "<br>".join(val)
+    return val
+
+def to_slash(val):
+    if isinstance(val, list):
+        return " / ".join(val)
+    return val
+
 cols = st.columns(4)
 for i, row in page_df.iterrows():
     with cols[i % 4]:
-        st.image(row["image_url"], use_column_width=True)
-        st.markdown("**Styles:**<br>" + "<br>".join(row["style_cd"]), unsafe_allow_html=True)
-        st.caption(f"{' / '.join(row['style_category'])} | {' / '.join(row['cstone_shape'])} | {' / '.join(row['metal_color'])}")
+        st.markdown(f'''
+            <div class="image-box">
+                <img src="{row["image_url"]}" alt="Style image">
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
+        st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
