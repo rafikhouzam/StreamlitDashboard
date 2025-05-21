@@ -43,9 +43,6 @@ def load_metadata():
     return pd.DataFrame(res.json())
 
 df = load_metadata()
-# Drop rows where visual_id is missing or empty string
-#df = df[df["visual_id"].notna() & (df["visual_id"] != "")]
-
 
 def safe_image(image_url, caption=None, width=250, height=250):
     sig = inspect.signature(st.image).parameters
@@ -66,6 +63,8 @@ style_category = st.sidebar.selectbox("Style Category", [""] + sorted(df["style_
 collection = st.sidebar.selectbox("Collection", [""] + sorted(df["collection"].dropna().unique()))
 metal_color = st.sidebar.selectbox("Metal Color", [""] + sorted(df["metal_color"].dropna().unique()))
 cstone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["cstone_shape"].dropna().unique()))
+ring_type = st.sidebar.selectbox("Ring Type", [""] + sorted(df["ring_type"].dropna().unique()))
+earring_type = st.sidebar.selectbox("Earring Type", [""] + sorted(df["earring_type"].dropna().unique()))
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
@@ -93,26 +92,25 @@ if metal_color:
 if cstone_shape:
     filtered_df = filtered_df[filtered_df["cstone_shape"] == cstone_shape]
 
+if ring_type:
+    filtered_df = filtered_df[filtered_df["ring_type"] == ring_type]
+
+if earring_type:
+    filtered_df = filtered_df[filtered_df["earring_type"] == earring_type]
+
+
 # === Step 2: Drop rows with bad image_url only
 filtered_df = filtered_df[
     filtered_df["image_url"].notna() &
     filtered_df["image_url"].astype(str).str.strip().ne("")
 ]
 
-# === Clean up invalid or blank visual_ids
-filtered_df["visual_id"] = filtered_df["visual_id"].astype(str).str.strip()
-filtered_df.loc[filtered_df["visual_id"] == "", "visual_id"] = pd.NA
-
-
-# === Step 3: Group SUMIT rows by visual_id, keep SAMPL rows as-is
-has_visual = filtered_df["visual_id"].notna()
-
-grouped_sumit = (
-    filtered_df[has_visual]
-    .groupby("visual_id")
+# Group all rows by style_cd and gather all associated images
+grouped_df = (
+    filtered_df
+    .groupby("style_cd")
     .agg({
-        "image_url": "first",
-        "style_cd": lambda x: list(x),
+        "image_url": lambda x: list(x.dropna().unique()),
         "style_category": lambda x: list(set(x.dropna())),
         "cstone_shape": lambda x: list(set(x.dropna())),
         "metal_color": lambda x: list(set(x.dropna()))
@@ -120,25 +118,8 @@ grouped_sumit = (
     .reset_index()
 )
 
-# Treat SAMPL rows as their own groups
-grouped_sampl = (
-    filtered_df[~has_visual]
-    .assign(visual_id=lambda df: df["style_cd"])  # overwrite fallback
-    .groupby("visual_id")
-    .agg({
-        "image_url": "first",
-        "style_cd": lambda x: list(x),
-        "style_category": lambda x: list(set(x.dropna())),
-        "cstone_shape": lambda x: list(set(x.dropna())),
-        "metal_color": lambda x: list(set(x.dropna()))
-    })
-    .reset_index()
-)
-
-grouped_df = pd.concat([grouped_sumit, grouped_sampl], ignore_index=True)
-grouped_df["sort_key"] = grouped_df["style_cd"].apply(lambda x: sorted(x)[0] if isinstance(x, list) and x else "")
+grouped_df["sort_key"] = grouped_df["style_cd"]
 grouped_df = grouped_df.sort_values("sort_key").reset_index(drop=True)
-
 
 # === Step 4: Pagination
 if len(grouped_df) > 0:
@@ -150,7 +131,7 @@ if len(grouped_df) > 0:
     page_df = grouped_df.iloc[start_idx:end_idx]
 
     # === Step 5: Display results
-    st.write(f"**Found {len(grouped_df)} matching visuals**")
+    st.write(f"**Found {len(filtered_df)} matching visuals**")
 
     def to_multiline(val):
         if isinstance(val, list):
@@ -164,13 +145,37 @@ if len(grouped_df) > 0:
 
     cols = st.columns(4)
     for i, row in page_df.iterrows():
+        style_key = row["style_cd"]
+        images = row["image_url"]
+        session_key = f"carousel_idx_{style_key}"
+
+        # Init index
+        if session_key not in st.session_state:
+            st.session_state[session_key] = 0
+
+        idx = st.session_state[session_key]
+
         with cols[i % 4]:
+            # === Image
             st.markdown(f'''
                 <div class="image-box">
-                    <img src="{row["image_url"]}" alt="Style image">
+                    <img src="{images[idx]}" alt="Style image">
                 </div>
             ''', unsafe_allow_html=True)
-            
+
+            # === Arrow Buttons in 3 Columns (left, center, right)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col1:
+                if st.button("◀", key=f"prev_{style_key}"):
+                    st.session_state[session_key] = (idx - 1) % len(images)
+                    st.rerun()
+            with col3:
+                if st.button("▶", key=f"next_{style_key}"):
+                    st.session_state[session_key] = (idx + 1) % len(images)
+                    st.rerun()
+
+            # === Index Indicator and metadata
+            st.caption(f"{idx + 1} / {len(images)}")
             st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
             st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
 else:
