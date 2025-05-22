@@ -40,8 +40,10 @@ More dashboards and features are coming soon as we expand the system.
 """)
 
 # --- Highlights / Updates Section ---
-st.info("🚀 Latest Update: Added carousel to image search to allow viewing multiple images of the same style")
-st.info("💻 In development: Similarity Search based on Image Upload (Shoutout Glory for the suggestion!)")
+# --- Highlights / Updates Section ---
+st.info("🚀 Reverse Image Search live! Upload any image to find visually similar styles using CLIP.")
+st.info("🖼️ New: Results displayed in a 4-column grid for faster browsing.")
+st.info("💡 Coming soon: Filters, clustering, and smarter tagging.")
 st.info("For any questions or development suggestions, feel free to email me at rafi@anerijewels.com")
 
 # Optional: future feature teaser

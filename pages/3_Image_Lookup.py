@@ -77,8 +77,10 @@ filtered_df = df.copy()
 if search_query:
     q = search_query.upper()
     filtered_df = filtered_df[
-        filtered_df["combined_text"].str.contains(q, na=False)
+        filtered_df["combined_text"].str.contains(q, na=False) |
+        filtered_df["style_cd"].str.upper().str.contains(q, na=False)
     ]
+
 
 if style_category:
     filtered_df = filtered_df[filtered_df["style_category"] == style_category]
