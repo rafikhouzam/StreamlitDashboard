@@ -34,13 +34,14 @@ This platform provides insights into our ecommerce performance and memo inventor
 Use the sidebar to navigate between:
 - 📦 **Ecommerce Product Performance**
 - 🪙 **Slow Moving Memo Analysis**
+- 🔎 **Image Lookup**
 
 More dashboards and features are coming soon as we expand the system.
 """)
 
 # --- Highlights / Updates Section ---
-st.info("🚀 Latest Update: Fully operational Image Lookup")
-st.info("💻 In development: Similarity Search based on Image Upload")
+st.info("🚀 Latest Update: Added carousel to image search to allow viewing multiple images of the same style")
+st.info("💻 In development: Similarity Search based on Image Upload (Shoutout Glory for the suggestion!)")
 st.info("For any questions or development suggestions, feel free to email me at rafi@anerijewels.com")
 
 # Optional: future feature teaser
