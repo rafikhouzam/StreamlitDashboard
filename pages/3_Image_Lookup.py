@@ -59,9 +59,22 @@ search_query = st.text_input("Search by Style Number or Description")
 # === Sidebar Filters ===
 st.sidebar.header("🔧 Filters")
 
+metal_color_map = {
+    "White": "W",
+    "Yellow": "Y",
+    "Yellow Vermeil": "YV",
+    "Pink": "P",
+    "Pink Vermeil": "PV",
+    "Pink White": "PW",
+    "Rose Gold": "R",  # Future-proof
+    "Two Tone": "T",
+    "Tri Color": "3",
+    "N": "N"
+}
+
 style_category = st.sidebar.selectbox("Style Category", [""] + sorted(df["style_category"].dropna().unique()))
 collection = st.sidebar.selectbox("Collection", [""] + sorted(df["collection"].dropna().unique()))
-metal_color = st.sidebar.selectbox("Metal Color", [""] + sorted(df["metal_color"].dropna().unique()))
+metal_color = st.sidebar.selectbox("Metal Color",[""] + list(metal_color_map.keys()))
 cstone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["cstone_shape"].dropna().unique()))
 ring_type = st.sidebar.selectbox("Ring Type", [""] + sorted(df["ring_type"].dropna().unique()))
 earring_type = st.sidebar.selectbox("Earring Type", [""] + sorted(df["earring_type"].dropna().unique()))
@@ -89,7 +102,8 @@ if collection:
     filtered_df = filtered_df[filtered_df["collection"] == collection]
 
 if metal_color:
-    filtered_df = filtered_df[filtered_df["metal_color"] == metal_color]
+    selected_code = metal_color_map[metal_color]
+    filtered_df = filtered_df[filtered_df["metal_color"] == selected_code]
 
 if cstone_shape:
     filtered_df = filtered_df[filtered_df["cstone_shape"] == cstone_shape]
