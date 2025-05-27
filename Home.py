@@ -37,13 +37,13 @@ Use the sidebar to navigate between:
 - 🔎 **Image Lookup**
 - 🔍 **Reverse Image Search**
 
-More dashboards and features are coming soon as we expand the system.
+More dashboards and features are coming soon as I expand the system.
 """)
 
 # --- Highlights / Updates Section ---
 # --- Highlights / Updates Section ---
-st.info("🚀 Reverse Image Search live! Upload any image to find visually similar styles using CLIP.")
-st.info("🖼️ New: Results displayed in a 4-column grid for faster browsing.")
+st.info("🚀 Reverse Image Search live! Upload any image to find visually similar styles using OpenAI CLIP Machine Learning Model.")
+st.info("🖼️ New: Image results displayed in a 4-column grid for faster browsing.")
 st.info("💡 Coming soon: Filters, clustering, and smarter tagging.")
 st.info("For any questions or development suggestions, feel free to email me at rafi@anerijewels.com")
 

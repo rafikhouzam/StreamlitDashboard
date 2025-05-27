@@ -78,6 +78,7 @@ metal_color = st.sidebar.selectbox("Metal Color",[""] + list(metal_color_map.key
 cstone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["cstone_shape"].dropna().unique()))
 ring_type = st.sidebar.selectbox("Ring Type", [""] + sorted(df["ring_type"].dropna().unique()))
 earring_type = st.sidebar.selectbox("Earring Type", [""] + sorted(df["earring_type"].dropna().unique()))
+diamond_type = st.sidebar.selectbox("Diamond Type", [""] + sorted(df["diamond_type"].dropna().unique()))
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
@@ -113,6 +114,9 @@ if ring_type:
 
 if earring_type:
     filtered_df = filtered_df[filtered_df["earring_type"] == earring_type]
+
+if diamond_type:
+    filtered_df = filtered_df[filtered_df["diamond_type"] == diamond_type]
 
 
 # === Step 2: Drop rows with bad image_url only
@@ -195,4 +199,4 @@ if len(grouped_df) > 0:
             st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
             st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
 else:
-    st.warning(f"No results found for **{search_query}**. Try a different search.")
+    st.warning(f"No results found. Try a different search.")
