@@ -35,6 +35,7 @@ Use the sidebar to navigate between:
 - 📦 **Ecommerce Product Performance**
 - 🪙 **Slow Moving Memo Analysis**
 - 🔎 **Image Lookup**
+- 🔍 **Reverse Image Search**
 
 More dashboards and features are coming soon as we expand the system.
 """)
