@@ -45,6 +45,17 @@ customer_names = {
     'Z011': 'Zales'
 }
 
+customer_groups = {
+    'AAFES': ['A058'],
+    'JCPenney': ['JC002'],
+    'Kohl’s': ['K029'],
+    'Macy’s': ['MA001'],
+    'QVC': ['QV001'],
+    'BlueNile - R2NET': ['R2002'],
+    'Kay/Jared/Outlet': ['KA002', 'ST001', 'ST004'],
+    'Zales': ['Z011']
+}
+
 customer_codes = list(customer_names.keys())
 customer_selected = st.sidebar.selectbox('Select Customer', customer_codes)
 
