@@ -26,7 +26,7 @@ def load_local():
     return df
 
 try:
-    df_master = load_local()
+    df_master = load_updated()
 except Exception as e:
     st.error("❌ Failed to load Ecomm data.")
     st.text(f"Error: {e}")
