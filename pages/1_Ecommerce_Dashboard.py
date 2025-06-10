@@ -68,7 +68,7 @@ st.sidebar.markdown(
 df_filtered = df_master[df_master['customer_id'] == customer_selected]
 
 # KPIs
-st.title(f"{customer_names[customer_selected]} Dashboard")
+st.title(f"{customer_names[customer_selected]} Dashboard (1/1/2023 - 6/9/2025)")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Sales", f"${df_filtered['sales_amt'].sum():,.0f}")
