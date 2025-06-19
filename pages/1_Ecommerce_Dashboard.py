@@ -22,7 +22,7 @@ def load_updated():
 
 @st.cache_data
 def load_local():
-    df = pd.read_csv('final_classified_2025-06-09.csv')
+    df = pd.read_csv('ecomm_dataset_2025-06-19.csv')
     return df
 
 try:
@@ -67,17 +67,19 @@ st.sidebar.markdown(
 # Filter DataFrame
 df_filtered = df_master[df_master['customer_id'] == customer_selected]
 
-# KPIs
-st.title(f"{customer_names[customer_selected]} Dashboard (1/1/2023 - 6/9/2025)")
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Sales", f"${df_filtered['sales_amt'].sum():,.0f}")
-col2.metric("Units Sold", f"{df_filtered['sales_qty'].sum():,.0f}")
-
+# Calculate Profit Margin
 total_profit = df_filtered["profit"].sum()
 total_sales = df_filtered["sales_amt"].sum()
 profit_pct = total_profit / total_sales * 100 if total_sales > 0 else 0
+
+# KPIs
+st.title(f"{customer_names[customer_selected]} Dashboard (1/1/2023 - 6/9/2025)")
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Sales", f"${df_filtered['sales_amt'].sum():,.0f}")
+col2.metric("Units Sold", f"{df_filtered['sales_qty'].sum():,.0f}")
 col3.metric("Profit Margin", f"{profit_pct:.1f}%")
+col4.metric("Inventory Value", f"${df_filtered['extended_cost'].sum():,.0f}")
 
 # Visualization 1: Performance by Style Category
 st.subheader("Performance by Style Category")
@@ -115,16 +117,58 @@ fig2.update_layout(
 )
 st.plotly_chart(fig2, use_container_width=True)
 
+#Visualization 3: Extended Cost Pie Chart by Category
+st.subheader("Extended Cost by Style Category")
+category_costs = (
+    df_filtered[df_filtered['extended_cost'].notna()]
+    .groupby('style_category')['extended_cost']
+    .sum()
+    .reset_index()
+    .sort_values(by='extended_cost', ascending=False)
+)
+
+fig_pie = px.pie(
+    category_costs,
+    names='style_category',
+    values='extended_cost',
+    title='Share of Inventory Value by Category'
+)
+st.plotly_chart(fig_pie)
+
+# Visualization 4: Top 50 Styles by Inventory Value
+top_styles = (
+    df_filtered[df_filtered['extended_cost'].notna()]
+    .sort_values(by='extended_cost', ascending=False)
+    .head(50)
+)
+
+fig = px.bar(
+    top_styles,
+    x='extended_cost',
+    y='style_cd',
+    orientation='h',
+    title='Top 50 Styles by Inventory Value',
+    labels={'extended_cost': 'Extended Cost ($)', 'style_cd': 'Style Code'}
+)
+
+fig.update_layout(
+    yaxis=dict(autorange="reversed"),  # ensures highest value at the top
+    xaxis_tickformat=',.0f'  # use ',.0s' for '5k', '10k' format instead
+)
+
+st.plotly_chart(fig)
+
+
 # Inventory Health
 st.subheader("⚡ Potential Stockouts (High Opportunity)")
 stockouts = df_filtered[(df_filtered['Total_Qty'] <= 3) & (df_filtered['sales_qty'] >= 5)]
 stockouts_sorted = stockouts.sort_values(by="sales_qty", ascending=False)
-st.dataframe(stockouts_sorted[['style_cd', 'style_category', 'sales_qty', 'Total_Qty']])
+st.dataframe(stockouts_sorted[['style_cd', 'style_category', 'sales_qty', 'Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
 
 st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales)")
 deadweight = df_filtered[(df_filtered['Total_Qty'] >= 5) & (df_filtered['sales_qty'] <= 1)]
 deadweight_sorted = deadweight.sort_values(by="Total_Qty", ascending=False)
-st.dataframe(deadweight_sorted[['style_cd', 'style_category', 'sales_qty', 'Total_Qty']])
+st.dataframe(deadweight_sorted[['style_cd', 'style_category', 'sales_qty', 'Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
 
 # Download
 st.subheader("⬇️ Download Customer Data")
