@@ -164,12 +164,12 @@ st.plotly_chart(fig)
 st.subheader("⚡ Potential Stockouts (High Opportunity)")
 stockouts = df_filtered[(df_filtered['Total_Qty'] <= 3) & (df_filtered['sales_qty'] >= 5)]
 stockouts_sorted = stockouts.sort_values(by="sales_qty", ascending=False)
-st.dataframe(stockouts_sorted[['style_cd', 'style_category', 'sales_qty', 'Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
+st.dataframe(stockouts_sorted[['style_cd', 'style_category', 'sales_qty',  'sales_amt', 'Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
 
 st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales)")
 deadweight = df_filtered[(df_filtered['Total_Qty'] >= 5) & (df_filtered['sales_qty'] <= 1)]
 deadweight_sorted = deadweight.sort_values(by="Total_Qty", ascending=False)
-st.dataframe(deadweight_sorted[['style_cd', 'style_category', 'sales_qty', 'Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
+st.dataframe(deadweight_sorted[['style_cd', 'style_category', 'sales_qty','Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
 
 # Download
 st.subheader("⬇️ Download Customer Data")
