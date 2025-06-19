@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 @st.cache_data
-def load_updated():
+def load_api():
     url = f"https://api.anerijewels.com/api/updated"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
@@ -22,14 +22,16 @@ def load_updated():
 
 @st.cache_data
 def load_local():
-    df = pd.read_csv('ecomm_dataset_2025-06-19.csv')
+    df = pd.read_csv('final_classified_patched_cost_filled_550.csv')
     return df
 
 try:
-    df_master = load_updated()
+    df_master = load_api()
 except Exception as e:
     st.error("❌ Failed to load Ecomm data.")
     st.text(f"Error: {e}")
+
+df_master = df_master.drop_duplicates()
 
 # Sidebar - Customer selection
 customer_names = {
@@ -148,7 +150,8 @@ fig = px.bar(
     y='style_cd',
     orientation='h',
     title='Top 50 Styles by Inventory Value',
-    labels={'extended_cost': 'Extended Cost ($)', 'style_cd': 'Style Code'}
+    labels={'extended_cost': 'Extended Cost ($)', 'style_cd': 'Style Code'},
+    hover_data=['Total_Qty']
 )
 
 fig.update_layout(
