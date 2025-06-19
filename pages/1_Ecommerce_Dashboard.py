@@ -31,8 +31,6 @@ except Exception as e:
     st.error("❌ Failed to load Ecomm data.")
     st.text(f"Error: {e}")
 
-df_master = df_master.drop_duplicates()
-
 # Sidebar - Customer selection
 customer_names = {
     'A058': 'AAFES',
