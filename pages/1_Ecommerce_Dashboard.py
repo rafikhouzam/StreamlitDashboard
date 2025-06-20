@@ -67,6 +67,8 @@ st.sidebar.markdown(
 # Filter DataFrame
 df_filtered = df_master[df_master['customer_id'] == customer_selected]
 
+df_filtered = df_filtered.drop_duplicates()
+
 # Calculate Profit Margin
 total_profit = df_filtered["profit"].sum()
 total_sales = df_filtered["sales_amt"].sum()
