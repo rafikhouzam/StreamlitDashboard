@@ -20,6 +20,10 @@ def load_memo():
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
+def load_local():
+    # Fallback to local CSV if API fails
+    return pd.read_csv("Cleaned_SlowMemo_2024_2025.csv")
+
 try:
     df = load_memo()
 except Exception as e:
@@ -43,6 +47,11 @@ if customer_selected:
 metal_selected = st.sidebar.multiselect("Metal Type(s)", df["Metal Kt"].unique())
 if metal_selected:
     df = df[df["Metal Kt"].isin(metal_selected)]
+
+# Filter: Performance Category
+performance_selected = st.sidebar.multiselect("Performance Category", df["Performance_Category"].unique())
+if metal_selected:
+    df = df[df["Performance_Category"].isin(metal_selected)]
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
