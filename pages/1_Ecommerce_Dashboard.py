@@ -22,7 +22,7 @@ def load_api():
 
 @st.cache_data
 def load_local():
-    df = pd.read_csv('final_classified_patched_cost_filled_550.csv')
+    df = pd.read_csv('ecomm_extended_cost_fixed.csv')
     return df
 
 try:
