@@ -22,10 +22,10 @@ def load_memo():
 
 def load_local():
     # Fallback to local CSV if API fails
-    return pd.read_csv("Cleaned_SlowMemo_2024_2025.csv")
+    return pd.read_csv("Cleaned_SlowMemo_July2025_v4.csv")
 
 try:
-    df = load_memo()
+    df = load_local()
 except Exception as e:
     st.error("❌ Failed to load updated data.")
     st.text(f"Error: {e}")
@@ -50,8 +50,8 @@ if metal_selected:
 
 # Filter: Performance Category
 performance_selected = st.sidebar.multiselect("Performance Category", df["Performance_Category"].unique())
-if metal_selected:
-    df = df[df["Performance_Category"].isin(metal_selected)]
+if performance_selected:
+    df = df[df["Performance_Category"].isin(performance_selected)]
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
@@ -61,11 +61,12 @@ st.sidebar.markdown(
 # === KPI Display ===
 st.subheader("🔢 Key Metrics")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric("Total Styles", f"{len(df):,}")
 col2.metric("Dead Weight", f"{(df['Performance_Category'] == 'Dead Weight').sum():,}")
 col3.metric("Slow Movers", f"{(df['Performance_Category'] == 'Slow Mover').sum():,}")
 col4.metric("Strong Sellers", f"{(df['Performance_Category'] == 'Strong Seller').sum():,}")
+col5.metric("Review", f"{(df['Performance_Category'] == 'Review').sum():,}")
 
 # === Display Sorted Table ===
 st.subheader("📋 Detailed Memo Table (Sorted)")
