@@ -112,11 +112,13 @@ fig2 = px.bar(
     title=f"{customer_names[customer_selected]} Overall Style Performance",
     color_discrete_sequence=['teal']
 )
+
 fig2.update_layout(
-    plot_bgcolor='white',
-    xaxis=dict(showgrid=True, gridcolor='lightgray'),
-    yaxis=dict(showgrid=True, gridcolor='lightgray')
+ #   plot_bgcolor='white',
+  #  xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    xaxis=dict(showgrid=True)
 )
+
 st.plotly_chart(fig2, use_container_width=True)
 
 #Visualization 3: Extended Cost Pie Chart by Category
@@ -149,7 +151,7 @@ fig = px.bar(
     x='extended_cost',
     y='style_cd',
     orientation='h',
-    title='Top 50 Styles by Inventory Value',
+    title='Top Styles by Inventory Value',
     labels={'extended_cost': 'Extended Cost ($)', 'style_cd': 'Style Code'},
     hover_data=['Total_Qty']
 )
