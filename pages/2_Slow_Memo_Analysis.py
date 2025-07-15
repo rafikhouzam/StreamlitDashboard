@@ -1,9 +1,12 @@
 import streamlit as st
 import pandas as pd
 import requests
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.worksheet.datavalidation import DataValidation
 
 # Page config
-
 st.set_page_config(
     page_title="Slow Moving Memo",
     page_icon="🪙",
@@ -103,21 +106,69 @@ df_sorted = df.sort_values(by=sort_column, ascending=ascending)
 # Display top rows
 st.dataframe(
     df_sorted[[
-        "AE", "Customer", "Metal Kt", "Style", "Style Description",
+        "AE", "Customer", "Metal Kt", "Style", "Style Description", "Inception Dt.",
         "Performance_Category", "Open_Memo_Qty", "Open_Memo_Amt",
         "Net_Sales_2025_YTD", "Expected_Sales_6mo"
     ]].style.format({
         "Open_Memo_Qty": "{:,}",
         "Open_Memo_Amt": "${:,.2f}",
         "Net_Sales_2025_YTD": "${:,.2f}",
-        "Expected_Sales_6mo": "{:,}"
+        "Expected_Sales_6mo": "${:,}"
     })
 )
 
-# Optional: CSV download
-st.download_button(
-    label="📥 Download Filtered Dataset",
-    data=df_sorted.to_csv(index=False),
-    file_name="Filtered_SlowMemo.csv",
-    mime="text/csv"
+# === Use your filtered DataFrame here
+df_filtered = df_sorted.copy()
+
+# === Insert new columns
+new_columns = ['Date_RA_Issued', 'Disposition', 'Comments']
+insert_after = 'RA_Issued'
+if insert_after in df_filtered.columns:
+    insert_loc = df_filtered.columns.get_loc(insert_after) + 1
+    for i, col in enumerate(new_columns):
+        df_filtered.insert(insert_loc + i, col, "")
+else:
+    for col in new_columns:
+        df_filtered[col] = ""
+
+# === Create Excel workbook
+wb = Workbook()
+ws = wb.active
+ws.title = "SlowMemoExport"
+
+# Write DataFrame to worksheet
+for r in dataframe_to_rows(df_filtered, index=False, header=True):
+    ws.append(r)
+
+# === Add dropdown data validation for Disposition column
+disp_col_idx = df_filtered.columns.get_loc('Disposition') + 1  # 1-based indexing
+disp_col_letter = ws.cell(row=1, column=disp_col_idx).column_letter
+dropdown_range = f"{disp_col_letter}2:{disp_col_letter}{len(df_filtered)+1}"
+dv = DataValidation(
+    type="list",
+    formula1='"Perpetual memo,Hold on memo/Monitor,RTV - Closeout,RTV- Melt,Other"',
+    allow_blank=True,
 )
+ws.add_data_validation(dv)
+dv.add(dropdown_range)
+
+# === Save to BytesIO buffer
+excel_buffer = BytesIO()
+wb.save(excel_buffer)
+excel_buffer.seek(0)
+
+# === Streamlit download button
+st.download_button(
+    label="📥 Download as Excel with Dropdowns",
+    data=excel_buffer,
+    file_name="Filtered_SlowMemo_With_Dropdown.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+# Optional: CSV download
+#st.download_button(
+ #   label="📥 Download Filtered Dataset",
+  #  data=df_sorted.to_csv(index=False),
+   # file_name="Filtered_SlowMemo.csv",
+   # mime="text/csv"
+#)
