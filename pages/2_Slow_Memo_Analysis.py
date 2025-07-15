@@ -25,7 +25,7 @@ def load_local():
     return pd.read_csv("Cleaned_SlowMemo_July2025_v4.csv")
 
 try:
-    df = load_local()
+    df = load_memo()
 except Exception as e:
     st.error("❌ Failed to load updated data.")
     st.text(f"Error: {e}")
