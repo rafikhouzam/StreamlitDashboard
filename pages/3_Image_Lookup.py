@@ -42,7 +42,12 @@ def load_metadata():
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
-df = load_metadata()
+@st.cache_data
+def load_local():
+    df = pd.read_csv('final_tagged_with_metadata_v2.csv')
+    return df
+
+df = load_local()
 
 def safe_image(image_url, caption=None, width=250, height=250):
     sig = inspect.signature(st.image).parameters
@@ -72,13 +77,33 @@ metal_color_map = {
     "N": "N"
 }
 
-style_category = st.sidebar.selectbox("Style Category", [""] + sorted(df["style_category"].dropna().unique()))
+ring_type = ""
+earring_type = ""
+hoop_subtype = ""
+chain_type = ""
+
+style_category = st.sidebar.multiselect("Style Category", [""] + sorted(df["style_category"].dropna().unique()))
 collection = st.sidebar.selectbox("Collection", [""] + sorted(df["collection"].dropna().unique()))
-metal_color = st.sidebar.selectbox("Metal Color",[""] + list(metal_color_map.keys()))
+metal_color = st.sidebar.multiselect("Metal Color",[""] + list(metal_color_map.keys()))
 cstone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["cstone_shape"].dropna().unique()))
-ring_type = st.sidebar.selectbox("Ring Type", [""] + sorted(df["ring_type"].dropna().unique()))
-earring_type = st.sidebar.selectbox("Earring Type", [""] + sorted(df["earring_type"].dropna().unique()))
 diamond_type = st.sidebar.selectbox("Diamond Type", [""] + sorted(df["diamond_type"].dropna().unique()))
+
+# === Conditional sidebar filters based on style_category selection ===
+ring_type = []
+earring_type = []
+
+if any(cat in style_category for cat in ["NECKLACE", "BRACELET", "ANKLET"]):
+    chain_type = st.sidebar.multiselect("Chain Type", [""] + sorted(df["chain_type"].dropna().unique()))
+
+if "RING" in style_category:
+    ring_type = st.sidebar.multiselect("Ring Type", sorted(df["ring_type"].dropna().unique()))
+
+if "EARRING" in style_category:
+    earring_type = st.sidebar.multiselect("Earring Type", sorted(df["earring_type"].dropna().unique()))
+
+if "Hoop" in earring_type:
+    hoop_subtype = st.sidebar.multiselect("Hoop Subtype", [""] + sorted(df["hoop_subtype"].dropna().unique()))
+
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
@@ -97,26 +122,32 @@ if search_query:
 
 
 if style_category:
-    filtered_df = filtered_df[filtered_df["style_category"] == style_category]
+    filtered_df = filtered_df[filtered_df["style_category"].isin(style_category)]
 
 if collection:
     filtered_df = filtered_df[filtered_df["collection"] == collection]
 
 if metal_color:
     selected_code = metal_color_map[metal_color]
-    filtered_df = filtered_df[filtered_df["metal_color"] == selected_code]
+    filtered_df = filtered_df[filtered_df["metal_color"].isin(selected_code)]
 
 if cstone_shape:
     filtered_df = filtered_df[filtered_df["cstone_shape"] == cstone_shape]
 
 if ring_type:
-    filtered_df = filtered_df[filtered_df["ring_type"] == ring_type]
+    filtered_df = filtered_df[filtered_df["ring_type"].isin(ring_type)]
 
 if earring_type:
-    filtered_df = filtered_df[filtered_df["earring_type"] == earring_type]
+    filtered_df = filtered_df[filtered_df["earring_type"].isin(earring_type)]
 
 if diamond_type:
     filtered_df = filtered_df[filtered_df["diamond_type"] == diamond_type]
+
+if chain_type:
+    filtered_df = filtered_df[filtered_df["chain_type"].isin(chain_type)]
+
+if hoop_subtype:
+    filtered_df = filtered_df[filtered_df["hoop_subtype"].isin(hoop_subtype)]
 
 
 # === Step 2: Drop rows with bad image_url only
