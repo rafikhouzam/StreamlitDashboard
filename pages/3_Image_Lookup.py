@@ -47,7 +47,7 @@ def load_local():
     df = pd.read_csv('final_tagged_with_metadata_v2.csv')
     return df
 
-df = load_local()
+df = load_metadata()
 
 def safe_image(image_url, caption=None, width=250, height=250):
     sig = inspect.signature(st.image).parameters
