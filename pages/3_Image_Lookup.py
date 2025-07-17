@@ -128,8 +128,8 @@ if collection:
     filtered_df = filtered_df[filtered_df["collection"] == collection]
 
 if metal_color:
-    selected_code = metal_color_map[metal_color]
-    filtered_df = filtered_df[filtered_df["metal_color"].isin(selected_code)]
+    selected_codes = [metal_color_map[color] for color in metal_color]
+    filtered_df = filtered_df[filtered_df["metal_color"].isin(selected_codes)]
 
 if cstone_shape:
     filtered_df = filtered_df[filtered_df["cstone_shape"] == cstone_shape]
