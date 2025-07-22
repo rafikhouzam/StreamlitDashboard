@@ -9,6 +9,9 @@ st.set_page_config(
     layout="wide"
 )
 
+if "image_cart" not in st.session_state:
+    st.session_state.image_cart = []
+
 st.title("🔎 Image Lookup")
 
 st.markdown("""
@@ -104,6 +107,21 @@ if "EARRING" in style_category:
 if "Hoop" in earring_type:
     hoop_subtype = st.sidebar.multiselect("Hoop Subtype", [""] + sorted(df["hoop_subtype"].dropna().unique()))
 
+st.sidebar.markdown("### 🛒 Cart")
+
+if st.session_state.image_cart:
+    for i, item in enumerate(st.session_state.image_cart):
+        st.sidebar.write(f"{item['style_cd']}")
+        if st.sidebar.button(f"❌ Remove {item['style_cd']}", key=f"remove_{i}"):
+            st.session_state.image_cart.pop(i)
+            st.rerun()
+    
+    # Download cart CSV
+    cart_df = pd.DataFrame(st.session_state.image_cart)
+    st.sidebar.download_button("📥 Download Cart", cart_df.to_csv(index=False), file_name="cart_items.csv", mime="text/csv")
+else:
+    st.sidebar.caption("Cart is empty.")
+
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
@@ -164,10 +182,17 @@ grouped_df = (
         "image_url": lambda x: list(x.dropna().unique()),
         "style_category": lambda x: list(set(x.dropna())),
         "cstone_shape": lambda x: list(set(x.dropna())),
-        "metal_color": lambda x: list(set(x.dropna()))
+        "metal_color": lambda x: list(set(x.dropna())),
+        "center_setting": "first",
+        "side_setting": "first",
+        "combined_text": "first",
+        "ring_type": "first",
+        "earring_type": "first",
+        "diamond_type": "first"
     })
     .reset_index()
 )
+
 
 grouped_df["sort_key"] = grouped_df["style_cd"]
 grouped_df = grouped_df.sort_values("sort_key").reset_index(drop=True)
@@ -227,6 +252,24 @@ if len(grouped_df) > 0:
 
             # === Index Indicator and metadata
             st.caption(f"{idx + 1} / {len(images)}")
+                        # === Add to Cart button
+            if st.button("🛒 Add to Cart", key=f"add_cart_{style_key}"):
+                already_in_cart = any(item['style_cd'] == style_key for item in st.session_state.image_cart)
+                if not already_in_cart:
+                    st.session_state.image_cart.append({
+                        "style_cd": style_key,
+                        "image_url": images[idx],
+                        "style_category": to_slash(row['style_category']),
+                        "cstone_shape": to_slash(row['cstone_shape']),
+                        "metal_color": to_slash(row['metal_color']),
+                        "combined_text": row.get("combined_text", ""),
+                        "ring_type": to_slash(row.get('ring_type', '')),
+                        "earring_type": to_slash(row.get('earring_type', '')),
+                        "cstone_shape": to_slash(row.get('cstone_shape', '')),
+                        "diamond_type": to_slash(row.get('diamond_type', ''))
+                    })
+                    st.success(f"Added {style_key} to cart.")
+
             st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
             st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
 else:
