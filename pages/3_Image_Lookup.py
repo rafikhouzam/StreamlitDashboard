@@ -197,11 +197,25 @@ grouped_df = (
 grouped_df["sort_key"] = grouped_df["style_cd"]
 grouped_df = grouped_df.sort_values("sort_key").reset_index(drop=True)
 
+def render_pagination(page_num, total_pages, label):
+    return st.number_input(
+        label,
+        min_value=1,
+        max_value=total_pages,
+        value=page_num,
+        step=1,
+        key=label  # unique key to distinguish top and bottom
+    )
+
 # === Step 4: Pagination
 if len(grouped_df) > 0:
     PAGE_SIZE = 24
     total_pages = (len(grouped_df) - 1) // PAGE_SIZE + 1
-    page_num = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
+    # Top pagination
+    page_num = render_pagination(st.session_state.get("page_num", 1), total_pages, "Page")
+
+    # Store in session so bottom control stays in sync
+    st.session_state.page_num = page_num
     start_idx = (page_num - 1) * PAGE_SIZE
     end_idx = start_idx + PAGE_SIZE
     page_df = grouped_df.iloc[start_idx:end_idx]
