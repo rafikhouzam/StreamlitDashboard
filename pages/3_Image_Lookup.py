@@ -283,6 +283,7 @@ if len(grouped_df) > 0:
                         "diamond_type": to_slash(row.get('diamond_type', ''))
                     })
                     st.success(f"Added {style_key} to cart.")
+                    st.rerun()
 
             st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
             st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
