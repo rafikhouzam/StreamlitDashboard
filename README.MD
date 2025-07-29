@@ -1,92 +1,93 @@
+
 # 💎 Jewelry Image Search & Tagging Platform
 
-Aneri Jewels · 2025  
+**Aneri Jewels · 2025**  
 Built by: Rafi Khouzam
 
 ## 🚀 Overview
 
-This system powers Aneri Jewels' internal tooling for managing, searching, and tagging product images at scale. It consolidates over 60,000 raw jewelry images into a clean, organized, and searchable database — complete with auto-tagging support, manual QA interface, and deep visual search via CLIP embeddings.
+This platform powers Aneri Jewels’ entire internal workflow for organizing, cleaning, tagging, and searching product images at scale. It transformed a chaotic archive of 60,000+ raw photos into a reliable, structured, and searchable dataset — complete with auto-tagging infrastructure, manual QA tools, and deep visual search powered by CLIP embeddings.
 
-> Replaces years of manual chaos with a modern, production-ready pipeline — saving time, improving accuracy, and enabling smart product discovery.
+> Replaced disorganized Dropbox folders and Excel sheets with a clean, automated system that is now the foundation of Aneri’s product imagery operations.
 
 ---
 
-## 🧱 Features
+## 🧱 Core Features
 
 ### ✅ Streamlit Dashboard
-- Multi-page app hosted via EC2 + CloudFront
-- Searchable by:
-  - Style number
-  - Description
-  - Category
-  - Metal color
-  - Collection
-  - Tag status (tagged/untagged/unsure)
-- Tagging interface with dropdown-based QA and optional comments
-- Team-based login and leaderboard system
+- Fully deployed multi-page app (EC2 + CloudFront)
+- Advanced filtering by:
+  - `style_cd`, `description`, `style_category`
+  - `metal_color`, `collection`, `tag status`
+- Manual tagging interface:
+  - Dropdown-based tags only (to reduce user error)
+  - Optional comment field
+- Built-in session management and leaderboard for tagging QA teams
 
-### 🔍 CLIP Visual Search
-- Deep learning similarity search powered by OpenAI's CLIP
-- Users can find visually similar styles using an anchor image
-- Optimized with FAISS for fast nearest-neighbor lookups
+### 🔍 CLIP-Powered Visual Search
+- Visual similarity search using OpenAI’s CLIP model
+- Search by image to find visually similar styles
+- Powered by FAISS with subsecond latency
+- Duplicate and low-confidence match handling included
 
-### 🧹 Image Cleanup Pipeline
-- Renames ~60,000+ raw files to match `style_cd` metadata
-- Drops duplicates, incorrect matches, and outdated photos
-- Organizes all usable images into category-based folders
-- Final cleaned set: ~13,000 high-quality, white background images
+### 🧹 Image Cleanup & Renaming Pipeline
+- Renamed over 60,000 raw product images using:
+  - Strict regex matching on `style_cd`, `vendor_sku`, and other fields
+  - Suffix-based filtering to isolate usable images
+- Removed duplicates, bad crops, incorrect items
+- Final cleaned image set: **~18,000 reliable white background images**, organized into:
+  - `anklets`, `bangles`, `bracelets`, `box_sets`, `earrings`, `necklaces`, `pendants`, `rings`
 
-### 🧠 Metadata Mapping
-- Combines multiple legacy datasets into one clean metadata source
-- Maps images to:
-  - `style_cd`, `style_description`
-  - `metal_color`, `center_stone`, `collection`
-  - `style_category`, `ring_type`, `chain_type`, etc.
-- Enables downstream analysis and automated tagging
+### 🧠 Metadata Mapping & Enrichment
+- Consolidated style-level metadata from multiple sources
+- Final metadata includes:
+  - `style_cd`, `style_description`, `metal_color`, `center_stone`
+  - `style_category`, `ring_type`, `chain_type`, `collection`, etc.
+- Mapped each cleaned image to complete metadata
+- Enables image-level search, clustering, tagging, and future ML tasks
 
 ---
 
 ## 🗂️ Folder Structure
 
-📁 final_whitebg_renamed_clean/ ← Cleaned, categorized images
-📁 dev/ ← Experimental and WIP modules
-📁 pages/ ← Streamlit multipage routes
-📄 app.py ← Main entry point
-📄 search_index.faiss ← CLIP vector index
-📄 metadata.csv ← Clean metadata with tag fields
-
+```bash
+📁 pages/                         # Streamlit multi-page routes  
+📄 Home.py                         # Main Streamlit entry point  
+```
 
 ---
 
 ## ⚙️ Tech Stack
 
-- **Python** · Streamlit · FastAPI (internal APIs)
-- **AWS**: EC2, S3, CloudFront
-- **CLIP**: Visual embeddings for image similarity
-- **FAISS**: High-speed nearest neighbor search
-- **Pandas/Numpy**: Heavy data wrangling
-- **Shell/Git**: Remote EC2 orchestration
+- **Frontend**: Streamlit multipage app (hosted on EC2, served via CloudFront)
+- **Backend**: FastAPI microservices (internal use only)
+- **Storage & Infra**: AWS EC2, S3, CloudFront, Linux (systemd)
+- **ML Infra**: OpenAI CLIP, FAISS for vector search
+- **Data**: Pandas, NumPy, regex-based filename logic, CSV pipelines
+- **DevOps**: Git, SCP, SSH, bash scripting for EC2 orchestration
 
 ---
 
 ## 👥 Contributors
 
-- Rafi Khouzam — Lead engineer, architect, & dashboard dev
-- India tagging team — Manual QA and tagging support
+- **Rafi Khouzam** — Lead architect, full-stack dev, image pipeline designer  
+- **India Back Office Tagging Team** — Manual QA and tagging support
 
 ---
 
-## 🔮 Future Ideas
+## 🔮 Future Directions
 
-- Tag suggestion engine using NLP + CLIP embeddings
-- External product recommendation widget
-- Automated image approval pipeline for new styles
-- Pricing engine using tag-based features
+- LoRA fine-tuning of CLIP on jewelry-specific tags  
+- AI-based tag suggestion system using embeddings + NLP  
+- Style-level price prediction using tags and embeddings  
+- External-facing product recommendation and search widget  
+- Onboarding pipeline for auto-approving new style images from vendors
 
 ---
 
 ## 🏁 Status
 
 ✅ **Live in production**  
-✅ **Actively used by internal teams**  
-⏳ Iterative improvements ongoing
+✅ **Used daily by internal QA teams**  
+✅ **13,000+ clean, tagged images**  
+⏳ **Ongoing improvements (auto-tagging, generative models, search UX)**
