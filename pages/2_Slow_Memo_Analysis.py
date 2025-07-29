@@ -12,7 +12,7 @@ st.set_page_config(
     page_icon="🪙",
     layout="wide"
 )
-st.title("🪙 Slow Moving Memo Analysis (2024–2025)")
+st.title("🪙 Slow Moving Memo Analysis")
 
 # Load dataset
 @st.cache_data
@@ -24,11 +24,13 @@ def load_memo():
     return pd.DataFrame(res.json())
 
 def load_local():
-    # Fallback to local CSV if API fails
-    return pd.read_csv("Cleaned_SlowMemo_July2025_v4.csv")
+    # Fallback to local CSV for testing
+    csv_path = st.secrets["LOCAL_MEMO_PATH"]
+    return pd.read_csv(csv_path)
 
 try:
-    df = load_memo()
+    use_local = st.secrets.get("USE_LOCAL_MEMO_DATA", False)
+    df = load_local() if use_local else load_memo()
 except Exception as e:
     st.error("❌ Failed to load updated data.")
     st.text(f"Error: {e}")
