@@ -1,0 +1,11 @@
+# Auto-detect and normalize line endings
+* text=auto
+
+# Ensure Python files always use LF (Unix-style)
+*.py text eol=lf
+
+# Optional: shell scripts also LF
+*.sh text eol=lf
+
+# Optional: Windows batch files use CRLF
+*.bat text eol=crlf
