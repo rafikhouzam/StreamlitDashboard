@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 import requests
 from io import BytesIO
 from openpyxl import Workbook
@@ -159,11 +160,22 @@ excel_buffer = BytesIO()
 wb.save(excel_buffer)
 excel_buffer.seek(0)
 
+# Get unique AE values and format
+ae_str = "-".join(df_filtered["AE"].dropna().unique())
+ae_str = ae_str.replace(" ", "_").replace("/", "_")
+
+# Get today's date
+today = datetime.today().strftime("%Y-%m-%d")
+
+# Build filename
+filename = f"SlowMemo_{ae_str}_{today}.xlsx"
+
+
 # === Streamlit download button
 st.download_button(
     label="📥 Download as Excel with Dropdowns",
     data=excel_buffer,
-    file_name="Filtered_SlowMemo_With_Dropdown.xlsx",
+    file_name=filename,
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
