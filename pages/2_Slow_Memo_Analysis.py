@@ -183,13 +183,14 @@ def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, 
     )
     st.plotly_chart(fig, use_container_width=True)
 
+
 # === Build pivots from df_filtered ===
 if "AE" in df_filtered.columns:
     ae_pivot = df_filtered.pivot_table(
         index="AE", columns="Performance_Category", values="Style", aggfunc="size", fill_value=0
     )
     ae_group_sorted = ae_pivot.assign(Total=ae_pivot.sum(axis=1)).sort_values("Total", ascending=False)
-    stacked_bar_from_pivot(ae_group_sorted, "AE", "AEs by Performance Category")
+    stacked_bar_from_pivot(ae_group_sorted, "AE", "AEs by Performance Category", top_n=None)
 
 top_n = st.slider("Top N Customers", 5, 20, 10, step=1)
 
