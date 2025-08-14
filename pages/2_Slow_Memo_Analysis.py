@@ -155,8 +155,6 @@ st.dataframe(
 # === Use your filtered DataFrame here
 df_filtered = df_sorted.copy()
 
-import plotly.express as px
-
 # === Pivot helper ===
 def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, top_n: int = 10):
     # Drop any 'Total' col if present, sort by total
@@ -186,21 +184,21 @@ def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, 
     st.plotly_chart(fig, use_container_width=True)
 
 # === Build pivots from df_filtered ===
-top_n = st.slider("Top N for AE/Customer charts", 5, 20, 10, step=1)
-
 if "AE" in df_filtered.columns:
     ae_pivot = df_filtered.pivot_table(
         index="AE", columns="Performance_Category", values="Style", aggfunc="size", fill_value=0
     )
     ae_group_sorted = ae_pivot.assign(Total=ae_pivot.sum(axis=1)).sort_values("Total", ascending=False)
-    stacked_bar_from_pivot(ae_group_sorted, "AE", "Top AEs by Performance Category", top_n=top_n)
+    stacked_bar_from_pivot(ae_group_sorted, "AE", "AEs by Performance Category")
+
+top_n = st.slider("Top N Customers", 5, 20, 10, step=1)
 
 if "Customer" in df_filtered.columns:
     customer_pivot = df_filtered.pivot_table(
         index="Customer", columns="Performance_Category", values="Style", aggfunc="size", fill_value=0
     )
     customer_group_sorted = customer_pivot.assign(Total=customer_pivot.sum(axis=1)).sort_values("Total", ascending=False)
-    stacked_bar_from_pivot(customer_group_sorted, "Customer", "Top Customers by Performance Category", top_n=top_n)
+    stacked_bar_from_pivot(customer_group_sorted, "Customer", "Top Customers by Count", top_n=top_n)
 
 
 # === Dispositions Analytics ===
