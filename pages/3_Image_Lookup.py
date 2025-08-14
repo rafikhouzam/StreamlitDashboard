@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import inspect
+import numpy as np
 
 st.set_page_config(
     page_title="Image Lookup",
@@ -91,6 +92,124 @@ metal_color = st.sidebar.multiselect("Metal Color",[""] + list(metal_color_map.k
 cstone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["cstone_shape"].dropna().unique()))
 diamond_type = st.sidebar.selectbox("Diamond Type", [""] + sorted(df["diamond_type"].dropna().unique()))
 
+# Safeguards 
+df["diamond_qty"] = pd.to_numeric(df["diamond_qty"], errors="coerce")
+df["diamond_wt"] = pd.to_numeric(df["diamond_wt"], errors="coerce")
+
+for col in ["diamond_qty", "diamond_wt"]:
+    if col not in df.columns:
+        df[col] = np.nan
+
+# Compute UX-friendly ranges (95th percentile) and hard maxima
+qty_p95 = int(df["diamond_qty"].quantile(0.95)) if df["diamond_qty"].notna().any() else 0
+qty_hard_max = int(df["diamond_qty"].max()) if df["diamond_qty"].notna().any() else 0
+
+wt_p95 = float(df["diamond_wt"].quantile(0.95)) if df["diamond_wt"].notna().any() else 0.0
+wt_hard_max = float(df["diamond_wt"].max()) if df["diamond_wt"].notna().any() else 0.0
+
+# track when the advanced checkbox toggles, so we can reset defaults cleanly
+def toggled(key, default=False):
+    prev_key = f"__prev_{key}"
+    prev = st.session_state.get(prev_key, default)
+    cur = st.session_state.get(key, default)
+    st.session_state[prev_key] = cur
+    return cur != prev
+
+with st.sidebar.expander("💎 Diamond Filters", expanded=False):
+    # ---- Slider (P95) ----
+    qty_range = st.slider(
+        "Diamond Quantity (common range)",
+        min_value=0, max_value=max(int(qty_p95), 1),
+        value=(0, max(int(qty_p95), 1)), step=1, key="qty_slider"
+    )
+
+    use_qty_manual = st.checkbox("Advanced: include outliers (custom min/max)", key="qty_adv")
+    if use_qty_manual:
+        hard_max_qty = int(qty_hard_max)
+
+        # On toggle ON, initialize manual inputs to full hard bounds
+        if toggled("qty_adv", default=False):
+            st.session_state["qty_min_manual_val"] = 0
+            st.session_state["qty_max_manual_val"] = hard_max_qty
+
+        c1, c2 = st.columns(2)
+        with c1:
+            qty_min_manual = st.number_input(
+                "Min qty",
+                min_value=0,
+                max_value=hard_max_qty,
+                value=st.session_state.get("qty_min_manual_val", 0),
+                step=1,
+                key=f"qty_min_manual_{hard_max_qty}",
+            )
+        with c2:
+            qty_max_manual = st.number_input(
+                "Max qty",
+                min_value=int(qty_min_manual),
+                max_value=hard_max_qty,
+                value=st.session_state.get("qty_max_manual_val", hard_max_qty),
+                step=1,
+                key=f"qty_max_manual_{hard_max_qty}",
+            )
+
+        # persist current manual values
+        st.session_state["qty_min_manual_val"] = int(qty_min_manual)
+        st.session_state["qty_max_manual_val"] = int(qty_max_manual)
+
+        qty_min, qty_max = int(qty_min_manual), int(qty_max_manual)
+    else:
+        qty_min, qty_max = int(qty_range[0]), int(qty_range[1])
+
+    # ---------- Weight ----------
+    wt_range = st.slider(
+        "Diamond Weight (ct, common range)",
+        min_value=0.0,
+        max_value=float(round(max(wt_p95, 0.01), 2)),
+        value=(0.0, float(round(max(wt_p95, 0.01), 2))),
+        step=0.01,
+        format="%.2f",
+        key="wt_slider"
+    )
+
+    use_wt_manual = st.checkbox("Advanced: include outliers (custom min/max)", key="wt_adv")
+    if use_wt_manual:
+        hard_max_wt = float(wt_hard_max)
+
+        if toggled("wt_adv", default=False):
+            st.session_state["wt_min_manual_val"] = 0.0
+            st.session_state["wt_max_manual_val"] = hard_max_wt
+
+        c3, c4 = st.columns(2)
+        with c3:
+            wt_min_manual = st.number_input(
+                "Min ct",
+                min_value=0.0,
+                max_value=hard_max_wt,
+                value=st.session_state.get("wt_min_manual_val", 0.0),
+                step=0.001,
+                format="%.3f",
+                key=f"wt_min_manual_{int(hard_max_wt*1000)}",
+            )
+        with c4:
+            wt_max_manual = st.number_input(
+                "Max ct",
+                min_value=float(wt_min_manual),
+                max_value=hard_max_wt,
+                value=st.session_state.get("wt_max_manual_val", hard_max_wt),
+                step=0.001,
+                format="%.3f",
+                key=f"wt_max_manual_{int(hard_max_wt*1000)}",
+            )
+
+        st.session_state["wt_min_manual_val"] = float(wt_min_manual)
+        st.session_state["wt_max_manual_val"] = float(wt_max_manual)
+
+        wt_min, wt_max = float(wt_min_manual), float(wt_max_manual)
+    else:
+        wt_min, wt_max = float(wt_range[0]), float(wt_range[1])
+
+#st.sidebar.caption(f"P95 qty={qty_p95}, MAX qty={qty_hard_max} | P95 wt={wt_p95:.3f}, MAX wt={wt_hard_max:.3f}")
+
 # === Conditional sidebar filters based on style_category selection ===
 ring_type = []
 earring_type = []
@@ -138,6 +257,15 @@ if search_query:
         filtered_df["style_cd"].str.upper().str.contains(q, na=False)
     ]
 
+
+# ==== Apply filters (same pattern as your ring_type filter) ====
+# (Fill NaNs to be inclusive of lower bounds)
+filtered_df = filtered_df[
+    filtered_df["diamond_qty"].fillna(0).between(qty_min, qty_max)
+]
+filtered_df = filtered_df[
+    filtered_df["diamond_wt"].fillna(0.0).between(wt_min, wt_max)
+]
 
 if style_category:
     filtered_df = filtered_df[filtered_df["style_category"].isin(style_category)]
