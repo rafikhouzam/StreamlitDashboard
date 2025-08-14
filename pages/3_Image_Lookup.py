@@ -86,6 +86,7 @@ earring_type = ""
 hoop_subtype = ""
 chain_type = ""
 
+gender = st.sidebar.selectbox("Gender", [""] + sorted(df["gender"].dropna().unique()))
 style_category = st.sidebar.multiselect("Style Category", [""] + sorted(df["style_category"].dropna().unique()))
 collection = st.sidebar.selectbox("Collection", [""] + sorted(df["collection"].dropna().unique()))
 metal_color = st.sidebar.multiselect("Metal Color",[""] + list(metal_color_map.keys()))
@@ -266,7 +267,8 @@ filtered_df = filtered_df[
 filtered_df = filtered_df[
     filtered_df["diamond_wt"].fillna(0.0).between(wt_min, wt_max)
 ]
-
+if gender:
+    filtered_df = filtered_df[filtered_df["gender"] == gender]
 if style_category:
     filtered_df = filtered_df[filtered_df["style_category"].isin(style_category)]
 
@@ -316,7 +318,8 @@ grouped_df = (
         "combined_text": "first",
         "ring_type": "first",
         "earring_type": "first",
-        "diamond_type": "first"
+        "diamond_type": "first",
+        "diamond_wt": "first"
     })
     .reset_index()
 )
@@ -414,6 +417,6 @@ if len(grouped_df) > 0:
                     st.rerun()
 
             st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
-            st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['metal_color'])}")
+            st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['diamond_wt'])} | {to_slash(row['metal_color'])}")
 else:
     st.warning(f"No results found. Try a different search.")
