@@ -264,10 +264,10 @@ else:
 
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Total Lines", f"{total_lines:,}")
-    k2.metric("Completion", f"{completion}%", f"-{unspecified_ct:,} Unspecified")
-    k3.metric("RTV", f"{rtv_ct:,}", f"${rtv_amt:,.0f}")
-    k4.metric("Hold/Monitor", f"{hold_ct:,}", f"${hold_amt:,.0f}")
-    k5.metric("Perpetual Memo", f"{perp_ct:,}", f"${perp_amt:,.0f}")
+    k2.metric("Completion", f"{completion}%", f"-{unspecified_ct:,} Unspecified", delta_color="off")
+    k3.metric("RTV", f"{rtv_ct:,}", f"${rtv_amt:,.0f}", delta_color="off")
+    k4.metric("Hold/Monitor", f"{hold_ct:,}", f"${hold_amt:,.0f}", delta_color="off")
+    k5.metric("Perpetual Memo", f"{perp_ct:,}", f"${perp_amt:,.0f}", delta_color="off")
 
     # Metric toggle
     metric = st.radio("Metric", ["Count", "Open_Memo_Amt ($)"], horizontal=True, index=0)
