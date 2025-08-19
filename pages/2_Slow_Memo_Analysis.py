@@ -101,7 +101,7 @@ col3.metric("Slow Movers", f"{(df['Performance_Category_New'] == 'Slow Mover').s
 col4.metric("Review", f"{(df['Performance_Category_New'] == 'Review').sum():,}")
 
 # === Display Sorted Table ===
-st.subheader("📋 Detailed Memo Table (Sorted)")
+st.subheader("Detailed Memo Table (Sorted)")
 
 sort_columns = {
     "Open Memo Qty": "Open_Memo_Qty",
@@ -203,7 +203,7 @@ if "Customer" in df_filtered.columns:
 
 
 # === Dispositions Analytics ===
-st.subheader("🧭 Dispositions Analytics")
+st.subheader("Dispositions Analytics")
 
 # Guard: if Disposition not present, show info and skip
 if "Disposition" not in df_filtered.columns:
@@ -245,7 +245,6 @@ else:
         df_analytics["_Amt"] = pd.to_numeric(df_analytics[amt_col], errors="coerce")
     else:
         df_analytics["_Amt"] = 0.0
-
     # KPIs
     total_lines = len(df_analytics)
     unspecified_ct = int((df_analytics["_Disposition"] == "Unspecified").sum())
@@ -309,13 +308,14 @@ else:
         )
         st.plotly_chart(bar, use_container_width=True)
 
-    # Items needing attention
-    st.markdown("#### Items Requiring Disposition")
+    hide_unspecified_table = st.checkbox("Show Table of Items Requiring Disposition", value=False)
     pending = df_analytics[df_analytics["_Disposition"] == "Unspecified"]
-    cols_show = [c for c in ["AE", "Customer", "Style", "Style Description", "Open_Memo_Qty", "Open_Memo_Amt", "Inception Dt.", "RA_Issued"] if c in pending.columns]
     if pending.empty:
-        st.success("All items have a disposition. ✅")
-    else:
+            st.success("All items have a disposition. ✅")
+    # Items needing attention
+    elif hide_unspecified_table:
+        st.markdown("#### Items Requiring Disposition")
+        cols_show = [c for c in ["AE", "Customer", "Style", "Style Description", "Open_Memo_Qty", "Open_Memo_Amt", "Inception Dt.", "RA_Issued"] if c in pending.columns]
         st.dataframe(
             pending[cols_show].style.format({
                 "Open_Memo_Qty": "{:,}" if "Open_Memo_Qty" in pending.columns else "{:}",
