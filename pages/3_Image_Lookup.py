@@ -47,11 +47,18 @@ def load_metadata():
     return pd.DataFrame(res.json())
 
 @st.cache_data
-def load_local():
-    df = pd.read_csv('final_tagged_with_metadata_v2.csv')
-    return df
+def load_local_metadata():
+    # Fallback to local CSV for testing
+    csv_path = st.secrets.get("LOCAL_METADATA_PATH", "final_tagged_with_metadata_v2.csv")
+    return pd.read_csv(csv_path)
 
-df = load_metadata()
+try:
+    use_local_meta = st.secrets.get("USE_LOCAL_METADATA_DATA", False)
+    df = load_local_metadata() if use_local_meta else load_metadata()
+except Exception as e:
+    st.error("❌ Failed to load metadata.")
+    st.text(f"Error: {e}")
+
 
 def safe_image(image_url, caption=None, width=250, height=250):
     sig = inspect.signature(st.image).parameters
@@ -81,6 +88,17 @@ metal_color_map = {
     "N": "N"
 }
 
+shape_tokens = (
+    df["diamond_shapes"]
+    .dropna()
+    .str.split(",")
+    .explode()
+    .str.strip()
+    .dropna()
+    .unique()
+)
+shape_tokens = sorted(shape_tokens)
+
 ring_type = ""
 earring_type = ""
 hoop_subtype = ""
@@ -90,7 +108,18 @@ gender = st.sidebar.selectbox("Gender", [""] + sorted(df["gender"].dropna().uniq
 style_category = st.sidebar.multiselect("Style Category", [""] + sorted(df["style_category"].dropna().unique()))
 collection = st.sidebar.selectbox("Collection", [""] + sorted(df["collection"].dropna().unique()))
 metal_color = st.sidebar.multiselect("Metal Color",[""] + list(metal_color_map.keys()))
-cstone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["cstone_shape"].dropna().unique()))
+center_stone_shape = st.sidebar.selectbox("Center Stone Shape", [""] + sorted(df["center_stone_shape"].dropna().unique()))
+
+selected_shapes = st.sidebar.multiselect("Diamond Shapes", shape_tokens)
+shape_mode = st.sidebar.radio("Match Mode for Diamond Shapes", ["Any (OR)", "All (AND)"], index=0)
+# Prepare a tokenized column (cached in-memory) for accurate matching
+if "_shape_set" not in df.columns:
+    df["_shape_set"] = (
+        df["diamond_shapes"]
+        .fillna("")
+        .apply(lambda s: set(t.strip() for t in s.split(",") if t.strip()))
+    )
+
 diamond_type = st.sidebar.selectbox("Diamond Type", [""] + sorted(df["diamond_type"].dropna().unique()))
 
 # Safeguards 
@@ -259,7 +288,7 @@ if search_query:
     ]
 
 
-# ==== Apply filters (same pattern as your ring_type filter) ====
+# ==== Apply filters ====
 # (Fill NaNs to be inclusive of lower bounds)
 filtered_df = filtered_df[
     filtered_df["diamond_qty"].fillna(0).between(qty_min, qty_max)
@@ -279,8 +308,16 @@ if metal_color:
     selected_codes = [metal_color_map[color] for color in metal_color]
     filtered_df = filtered_df[filtered_df["metal_color"].isin(selected_codes)]
 
-if cstone_shape:
-    filtered_df = filtered_df[filtered_df["cstone_shape"] == cstone_shape]
+if center_stone_shape:
+    filtered_df = filtered_df[filtered_df["center_stone_shape"] == center_stone_shape]
+
+if selected_shapes:
+    sel_set = set(selected_shapes)
+    if shape_mode == "Any (OR)":
+        mask = df["_shape_set"].apply(lambda s: bool(s & sel_set))      # intersection non-empty
+    else:  # "All (AND)"
+        mask = df["_shape_set"].apply(lambda s: sel_set.issubset(s))    # all selected present
+    filtered_df = df[mask]
 
 if ring_type:
     filtered_df = filtered_df[filtered_df["ring_type"].isin(ring_type)]
@@ -311,7 +348,8 @@ grouped_df = (
     .agg({
         "image_url": lambda x: list(x.dropna().unique()),
         "style_category": lambda x: list(set(x.dropna())),
-        "cstone_shape": lambda x: list(set(x.dropna())),
+        "center_stone_shape": "first",
+        "diamond_shapes": lambda x: list(set(x.dropna())),
         "metal_color": lambda x: list(set(x.dropna())),
         "center_setting": "first",
         "side_setting": "first",
@@ -405,18 +443,18 @@ if len(grouped_df) > 0:
                         "style_cd": style_key,
                         "image_url": images[idx],
                         "style_category": to_slash(row['style_category']),
-                        "cstone_shape": to_slash(row['cstone_shape']),
+                        "center_stone_shape": to_slash(row['center_stone_shape']),
                         "metal_color": to_slash(row['metal_color']),
                         "combined_text": row.get("combined_text", ""),
                         "ring_type": to_slash(row.get('ring_type', '')),
                         "earring_type": to_slash(row.get('earring_type', '')),
-                        "cstone_shape": to_slash(row.get('cstone_shape', '')),
+                        "center_stone_shape": to_slash(row.get('center_stone_shape', '')),
                         "diamond_type": to_slash(row.get('diamond_type', ''))
                     })
                     st.success(f"Added {style_key} to cart.")
                     st.rerun()
 
             st.markdown("**Styles:**<br>" + to_multiline(row["style_cd"]), unsafe_allow_html=True)
-            st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['cstone_shape'])} | {to_slash(row['diamond_wt'])} | {to_slash(row['metal_color'])}")
+            st.caption(f"{to_slash(row['style_category'])} | {to_slash(row['center_stone_shape'])} | {to_slash(row['diamond_wt'])} | {to_slash(row['metal_color'])}")
 else:
     st.warning(f"No results found. Try a different search.")
