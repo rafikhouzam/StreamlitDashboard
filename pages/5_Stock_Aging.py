@@ -152,88 +152,53 @@ with kpi3:
 st.caption("These are your baseline totals.")
 
 # -----------------------------
-# 📊 Step 2: Aging Breakdown
+# 📊 Step 2: Aging Breakdown (Units only)
 # -----------------------------
-# Your bucket columns already represent counts of units by age per row.
-# We'll aggregate units per bucket, and proportionally allocate Amount and Wtd Cost by units share.
-
+# Aggregate UNITS by bucket only (no $ allocation)
 units_total = float(_df[col_qty].sum())
-cost_total  = float(_df[col_cost].sum())
-amount_total= float(_df[col_amt].sum())
 
-# Proportional allocation of $ by bucket at the item level, then sum
-alloc_frames = []
-for b in bucket_cols:
-    share = np.where(_df[col_qty] > 0, _df[b] / _df[col_qty], 0.0)
-    alloc = pd.DataFrame({
-        "Aging_Bucket": b,
-        "Stock_Units": _df[b],
-        "Amount_Alloc": share * _df[col_amt],
-        "Cost_Alloc": share * _df[col_cost],
+
+aging_units = (
+    pd.DataFrame({
+        "Aging_Bucket": bucket_cols,
+        "Stock_Units": [float(_df[b].sum()) for b in bucket_cols],
     })
-    alloc_frames.append(alloc)
-aging_alloc = pd.concat(alloc_frames, ignore_index=True)
-aging = (
-    aging_alloc.groupby("Aging_Bucket", as_index=False)
-               .agg(Stock_Units=("Stock_Units", "sum"),
-                    Amount_Total=("Amount_Alloc", "sum"),
-                    Cost_Total=("Cost_Alloc", "sum"))
 )
-
-bucket_order = ["30-Jan", "30 - 60", "60 - 90", "90 - 180", "> 180"]
-aging = aging.set_index("Aging_Bucket").reindex(bucket_order).fillna(0).reset_index()
-aging["% of Units"] = np.where(units_total > 0, aging["Stock_Units"] / units_total, 0.0)
-aging["% of Amount"] = np.where(amount_total > 0, aging["Amount_Total"] / amount_total, 0.0)
-aging["% of Cost"] = np.where(cost_total > 0, aging["Cost_Total"] / cost_total, 0.0)
+aging_units["% of Units"] = np.where(units_total > 0, aging_units["Stock_Units"] / units_total, 0.0)
 
 c1, c2 = st.columns([1.1, 1])
 with c1:
     st.dataframe(
-        aging.assign(**{
-            "% of Units": (aging["% of Units"]*100).round(1).astype(str) + "%",
-            "% of Amount": (aging["% of Amount"]*100).round(1).astype(str) + "%",
-            "% of Cost": (aging["% of Cost"]*100).round(1).astype(str) + "%",
-            "Amount_Total": aging["Amount_Total"].round(0).map(lambda v: f"${v:,.0f}"),
-            "Cost_Total": aging["Cost_Total"].round(0).map(lambda v: f"${v:,.0f}"),
+        aging_units.assign(**{
+            "% of Units": (aging_units["% of Units"]*100).round(1).astype(str) + "%",
         }),
         use_container_width=True,
         hide_index=True,
     )
 with c2:
-    st.bar_chart(aging.set_index("Aging_Bucket")["Stock_Units"], height=260)
+    st.bar_chart(aging_units.set_index("Aging_Bucket")["Stock_Units"], height=260)
+
+st.caption("Unit-based aging only. Source does not provide bucketed $ amounts.")
 
 # -----------------------------
 # 🐌 Step 3: Slow-Moving Stock (>180)
 # -----------------------------
 slow_bucket = "> 180"
 
-# Build per-item allocation for the slow bucket
-share_slow = np.where(_df[col_qty] > 0, _df[slow_bucket] / _df[col_qty], 0.0)
-slow_view = _df.copy()
-slow_view["Units_Slow"] = _df[slow_bucket]
-slow_view["Amount_Slow"] = share_slow * _df[col_amt]
-slow_view["Cost_Slow"] = share_slow * _df[col_cost]
+units_slow = float(_df[slow_bucket].sum())
+units_total = float(_df[col_qty].sum())
 
-units_slow = float(slow_view["Units_Slow"].sum())
-amount_slow = float(slow_view["Amount_Slow"].sum())
-cost_slow = float(slow_view["Cost_Slow"].sum())
 
-k1, k2, k3 = st.columns(3)
+k1 = st.columns(1)[0]
 with k1:
     pct_units = (units_slow/units_total*100) if units_total else 0
     st.metric(">180d: % of Units", f"{pct_units:.1f}%")
-with k2:
-    pct_cost = (cost_slow/cost_total*100) if cost_total else 0
-    st.metric(">180d: % of Cost", f"{pct_cost:.1f}%")
-with k3:
-    pct_amt = (amount_slow/amount_total*100) if amount_total else 0
-    st.metric(">180d: % of Amount", f"{pct_amt:.1f}%")
 
-st.subheader("Top 20 Styles by $ Value in >180d")
+st.subheader("Top 20 Styles by Units in >180d")
 if units_slow > 0:
-    top20 = (
-        slow_view[[col_item_id, col_desc, col_qty, "Units_Slow", "Amount_Slow", "Cost_Slow", "Category", col_amt, col_cost]]
-        .sort_values("Amount_Slow", ascending=False)
+    top20_units = (
+        _df[[col_item_id, col_desc, col_qty, col_amt, col_cost, slow_bucket, "Category", col_was_dupe]]
+        .sort_values(slow_bucket, ascending=False)
         .head(20)
         .rename(columns={
             col_item_id: "Item_ID",
@@ -241,9 +206,10 @@ if units_slow > 0:
             col_qty: "Stock",
             col_amt: "Amount",
             col_cost: "Wtd Cost",
+            slow_bucket: ">180 Units",
         })
     )
-    st.dataframe(top20, use_container_width=True, hide_index=True)
+    st.dataframe(top20_units, use_container_width=True, hide_index=True)
 else:
     st.info("No units in the >180 bucket under current filters.")
 
@@ -251,27 +217,22 @@ else:
 # 💎 Step 4: Category / Description Insights
 # -----------------------------
 # Use the allocated slow/amount per item to compute category-level slow share
-cat = slow_view.copy()
-by_cat = (
-    cat.groupby("Category", as_index=False)
-       .agg(
-           Units_Total=(col_qty, "sum"),
-           Units_Slow=("Units_Slow", "sum"),
-           Amount_Total=(col_amt, "sum"),
-           Amount_Slow=("Amount_Slow", "sum"),
-       )
+# Compute category-level share of slow units
+by_cat_units = (
+_df.groupby("Category", as_index=False)
+.agg(
+Units_Total=(col_qty, "sum"),
+Units_Slow=(slow_bucket, "sum"),
 )
-by_cat["% Units Slow"] = np.where(by_cat["Units_Total"]>0, by_cat["Units_Slow"] / by_cat["Units_Total"], 0.0)
-by_cat["% Amount Slow"] = np.where(by_cat["Amount_Total"]>0, by_cat["Amount_Slow"] / by_cat["Amount_Total"], 0.0)
+)
+by_cat_units["% Units Slow"] = np.where(by_cat_units["Units_Total"]>0, by_cat_units["Units_Slow"] / by_cat_units["Units_Total"], 0.0)
+
 
 st.dataframe(
-    by_cat.sort_values("% Amount Slow", ascending=False)
-          .assign(**{
-              "% Units Slow": (by_cat["% Units Slow"]*100).round(1).astype(str) + "%",
-              "% Amount Slow": (by_cat["% Amount Slow"]*100).round(1).astype(str) + "%",
-              "Amount_Total": by_cat["Amount_Total"].round(0).map(lambda v: f"${v:,.0f}"),
-              "Amount_Slow": by_cat["Amount_Slow"].round(0).map(lambda v: f"${v:,.0f}"),
-          }),
+    by_cat_units.sort_values("% Units Slow", ascending=False)
+        .assign(**{
+            "% Units Slow": (by_cat_units["% Units Slow"]*100).round(1).astype(str) + "%",
+        }),
     use_container_width=True,
     hide_index=True,
 )
