@@ -1,5 +1,3 @@
-# Stock Aging Inventory Analysis
-
 from __future__ import annotations
 
 import io
@@ -16,9 +14,6 @@ import streamlit as st
 st.set_page_config(page_title="Stock Aging", page_icon="📦", layout="wide")
 st.title("📦 Stock Aging Inventory")
 
-# -----------------------------
-# Data Load
-# -----------------------------
 @st.cache_data
 def load_stock():
     """Load stock aging data from your protected API endpoint (JSON)."""
@@ -78,21 +73,7 @@ def currency(x: float) -> str:
     except Exception:
         return "-"
 
-# -----------------------------
-# Data Source info (sidebar)
-# -----------------------------
-with st.sidebar:
-    st.subheader("Data Source")
-    if st.secrets.get("USE_LOCAL_STOCK_DATA", False):
-        st.text("📂 Using local CSV from st.secrets['LOCAL_STOCK_PATH']")
-    else:
-        st.text("🌐 Using API: https://api.anerijewels.com/api/stock")
-    if st.button("↻ Refresh data"):
-        load_stock.clear()
-        load_stock_local.clear()
-        st.experimental_rerun()
-
-col_item_id = " item_id"  # note leading space per preview; trim below
+col_item_id = "item_id"  # note leading space per preview; trim below
 col_desc    = "Description"
 col_qty     = "Stock"
 col_cost    = "Wtd Cost"
@@ -126,12 +107,14 @@ if col_was_dupe not in _df.columns:
 # -----------------------------
 # Filters
 # -----------------------------
+# Add a helpful per-row dominant bucket label for display
+_df["Dominant_Bucket"] = _df[bucket_cols].idxmax(axis=1)
+
 with st.sidebar:
     st.subheader("Filters")
     cats = sorted(_df["Category"].dropna().unique().tolist())
     sel_cats = st.multiselect("Category", cats)
-    buckets = ["0-30", "30-60", "60-90", "90-180", ">180"]
-    sel_buckets = st.multiselect("Aging Bucket", buckets)
+    sel_buckets = st.multiselect("Aging Bucket (has units in)", bucket_cols)
     text_search = st.text_input("Search in Description")
     min_qty = st.number_input("Min Stock Qty", value=0, min_value=0)
 
@@ -139,7 +122,8 @@ mask = pd.Series(True, index=_df.index)
 if sel_cats:
     mask &= _df["Category"].isin(sel_cats)
 if sel_buckets:
-    mask &= _df["Aging_Bucket"].astype(str).isin(sel_buckets)
+    # keep rows that have >0 units in any selected bucket
+    mask &= (_df[sel_buckets].sum(axis=1) > 0)
 if text_search:
     mask &= _df[col_desc].astype(str).str.contains(text_search, case=False, na=False)
 if min_qty > 0:
@@ -295,28 +279,29 @@ st.dataframe(
 # -----------------------------
 # 📈 Step 5 (Optional): Movement Opportunities
 # -----------------------------
-st.markdown("---")
-st.markdown("## 📈 Step 5 (Optional): Movement Opportunities")
 DF["Cost_to_Amount"] = np.where(DF[col_amt].abs()>0, DF[col_cost] / DF[col_amt], np.nan)
+
+# include Dominant_Bucket for context
+cols_common = [col_item_id, col_desc, col_qty, col_cost, col_amt, "Dominant_Bucket", "Category", col_was_dupe]
 
 cA, cB = st.columns(2)
 with cA:
     st.markdown("**High Cost-to-Amount (Potential Over-Carried)**")
     high_ratio = (
-        DF[[col_item_id, col_desc, col_qty, col_cost, col_amt, "Cost_to_Amount", "Aging_Bucket", "Category", "was_duplicate"]]
+        DF[cols_common + ["Cost_to_Amount"]]
         .copy()
     )
     high_ratio = high_ratio[high_ratio["Cost_to_Amount"] >= 1.2].sort_values("Cost_to_Amount", ascending=False).head(20)
     if len(high_ratio):
-        st.dataframe(high_ratio.rename(columns={col_item_id: "Item_ID", col_desc: "Description", col_qty: "Stock_Qty", col_cost: "Weighted_Cost", col_amt: "Amount"}), use_container_width=True, hide_index=True)
+        st.dataframe(high_ratio.rename(columns={col_item_id: "Item_ID", col_desc: "Description", col_qty: "Stock", col_cost: "Wtd Cost", col_amt: "Amount"}), use_container_width=True, hide_index=True)
     else:
         st.info("No items meet the current Cost/Amount threshold.")
 
 with cB:
     st.markdown("**QA List: was_duplicate = True**")
-    qa = DF[DF["was_duplicate"] == True][[col_item_id, col_desc, col_qty, col_cost, col_amt, "Aging_Bucket", "Category", "was_duplicate"]].copy()
+    qa = DF[DF[col_was_dupe] == True][cols_common].copy()
     if len(qa):
-        st.dataframe(qa.rename(columns={col_item_id: "Item_ID", col_desc: "Description", col_qty: "Stock_Qty", col_cost: "Weighted_Cost", col_amt: "Amount"}).sort_values(col_amt, ascending=False).head(50), use_container_width=True, hide_index=True)
+        st.dataframe(qa.rename(columns={col_item_id: "Item_ID", col_desc: "Description", col_qty: "Stock", col_cost: "Wtd Cost", col_amt: "Amount"}).sort_values(col_amt, ascending=False).head(50), use_container_width=True, hide_index=True)
     else:
         st.caption("No flagged duplicates under current filters.")
 
@@ -335,4 +320,4 @@ st.download_button(
     mime="text/csv",
 )
 
-st.success("Stock Aging page ready. Hook it up to your FastAPI base URL in the sidebar.")
+st.success("Stock Aging page ready. Hooked to your API with fixed schema & bucket logic.")
