@@ -5,3 +5,6 @@ utils/*
 archives/
 data/
 notebooks/*
+__pycache__/
+*.ipynb_checkpoints
+*.ipynb
