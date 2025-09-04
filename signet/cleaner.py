@@ -66,14 +66,33 @@ class SignetCleaner:
             denom = df["total_on_hand_units"].replace(0, pd.NA)
             df["sell_through"] = (df["total_monthly_sales"] / denom).astype(float)
         
-            columns_to_fill = [
-                "total_monthly_sales",
-                "total_on_hand_units",
-                "ly_total_on_hand_units",
-                "store_total_units"
-            ]
-        df[columns_to_fill] = df[columns_to_fill].fillna(0).astype(int)
-        df["sell_through"] = df["sell_through"].fillna(0).astype(float)
+        columns_to_fill = [
+            "total_monthly_sales",
+            "total_on_hand_units",
+            "ly_total_on_hand_units",
+            "store_total_units"
+        ]
+
+        df[columns_to_fill] = (
+            df[columns_to_fill]
+            .apply(pd.to_numeric, errors="coerce")
+            .astype("Int64")  # capital I -> nullable integer
+        )
+        df["sell_through"] = df["sell_through"].astype(float)  # leaves NaN as NaN
+        # --- Per-month totals (Signet vs Vendor perspectives) ---
+        units = pd.to_numeric(df["total_monthly_sales"], errors="coerce").fillna(0)
+        retail_num = pd.to_numeric(df["retail"], errors="coerce")
+        cost_num   = pd.to_numeric(df["cost"],   errors="coerce")
+
+        # Signet’s revenue & GM
+        df["signet_revenue"] = (retail_num * units).astype(float)                # retail × units
+        df["vendor_revenue"] = (cost_num   * units).astype(float)                # cost × units (what they pay you)
+        df["signet_gross_margin_dollars"] = (df["signet_revenue"] - df["vendor_revenue"]).astype(float)
+        
+        with pd.option_context("mode.use_inf_as_na", True):
+            df["signet_gross_margin_pct"] = (df["signet_gross_margin_dollars"] / df["signet_revenue"])
+
+
         df['sku'] = df['sku'].str.strip('.0')
             
         return df
