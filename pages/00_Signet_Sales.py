@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import streamlit as st
 import requests
+import altair as alt
+import plotly.express as px
 
 st.set_page_config(page_title="Signet Sales", layout="wide")
 
@@ -90,10 +92,9 @@ months = sorted(df.get("report_month", pd.Series([], dtype=str)).dropna().unique
 logos = sorted(df.get("logo", pd.Series([], dtype=str)).dropna().unique().tolist())
 cats = sorted(df.get("merch_category", pd.Series([], dtype=str)).dropna().unique().tolist())
 
-colf1, colf2, colf3, colf4 = st.columns([1,1,1,2])
-month_choice = colf1.selectbox("Month", ["All"] + months, index=(len(months) if months else 0))
-logo_choice = colf2.selectbox("Logo", ["All"] + logos, index=0)
-cat_choice = colf3.selectbox("Category", ["All"] + cats, index=0)
+month_choice = st.sidebar.selectbox("Month", ["All"] + months, index=(len(months) if months else 0))
+logo_choice = st.sidebar.selectbox("Logo", ["All"] + logos, index=0)
+cat_choice = st.sidebar.selectbox("Category", ["All"] + cats, index=0)
 if not USE_LOCAL and month_choice != "All":
     # pull filtered directly from API to avoid big payloads
     df = load_signet(month_choice)
@@ -138,26 +139,151 @@ if "report_month" in dfv.columns:
         st.bar_chart(ms.set_index("report_month")[["total_sales", "on_hand"]], height=240)
 
 # ---------- Category breakdown ----------
-if {"merch_category", "total_monthly_sales"} <= set(dfv.columns):
-    st.markdown("### Sales by Category")
-    by_cat = (
-        dfv.groupby("merch_category")["total_monthly_sales"]
-            .sum()
-            .sort_values(ascending=False)
+def render_plotly_chart(df: pd.DataFrame, label_col: str, value_col: str, title: str, key: str):
+    if not ({label_col, value_col} <= set(df.columns)):
+        st.info(f"Missing columns for {title}: need {label_col}, {value_col}")
+        return
+
+    agg = (
+        df.groupby(label_col, dropna=False)[value_col]
+          .sum()
+          .reset_index()
+          .sort_values(value_col, ascending=False)
     )
-    st.bar_chart(by_cat, height=240)
+    #agg[label_col] = agg[label_col].fillna("Unknown")
+    agg = agg[agg[value_col] != 0]
+
+
+    chart_type = st.radio("Chart type", ["Bar", "Pie"], horizontal=True, key=key)
+
+    if chart_type == "Bar":
+        fig = px.bar(
+            agg,
+            x=label_col,
+            y=value_col,
+            text_auto=True,
+            title=title,
+            labels={label_col: label_col.replace("_", " ").title(),
+                    value_col: value_col.replace("_", " ").title()},
+        )
+        fig.update_layout(uniformtext_minsize=8, uniformtext_mode="hide")
+        st.plotly_chart(fig, use_container_width=True)
+
+    else:  # Pie
+        fig = px.pie(
+            agg,
+            names=label_col,
+            values=value_col,
+            title=title,
+            hole=0.3,
+        )
+        fig.update_traces(textinfo="label+percent", hovertemplate="%{label}<br>%{value:,}")
+        st.plotly_chart(fig, use_container_width=True)
+
+
+# Units by merch_category (toggle bar/pie)
+if {"merch_category", "total_monthly_sales"} <= set(dfv.columns):
+    render_plotly_chart(
+        df=dfv,
+        label_col="merch_category",
+        value_col="total_monthly_sales",
+        title="Unit Sales by Merch Category",
+        key="plotly_units_by_cat"
+    )
+
+# Vendor revenue by inferred style_category (toggle bar/pie)
+if {"style_category", "vendor_revenue"} <= set(dfv.columns):
+    render_plotly_chart(
+        df=dfv,
+        label_col="style_category",
+        value_col="vendor_revenue",
+        title="Vendor Revenue by Style Category",
+        key="plotly_revenue_by_style"
+    )
+
+if {"style_category", "total_monthly_sales"} <= set(dfv.columns):
+    render_plotly_chart(
+        df=dfv,
+        label_col="style_category",
+        value_col="total_monthly_sales",
+        title="Unit Sales by Style Category",
+        key="plotly_units_by_style"
+    )
+
+if {"logo", "total_monthly_sales"} <= set(dfv.columns):
+    st.markdown("### Unit Sales by Logo")
+
+    agg = (
+        dfv.groupby("logo", dropna=False)["total_monthly_sales"]
+           .sum()
+           .reset_index()
+           .sort_values("total_monthly_sales", ascending=False)
+    )
+    agg["logo"] = agg["logo"].fillna("Unknown")
+    agg = agg[agg["total_monthly_sales"] != 0]  # 👈 drop zeros
+
+    fig = px.bar(
+        agg,
+        x="logo",
+        y="total_monthly_sales",
+        text_auto=True,
+        title="Unit Sales by Logo",
+        labels={
+            "logo": "Logo",
+            "total_monthly_sales": "Units Sold"
+        },
+    )
+    fig.update_layout(uniformtext_minsize=8, uniformtext_mode="hide")
+    st.plotly_chart(fig, use_container_width=True)
+
+
+
+if {"style_category", "signet_gross_margin_pct"} <= set(dfv.columns):
+    chart = alt.Chart(dfv).mark_boxplot().encode(
+        x="style_category:N",
+        y="signet_gross_margin_pct:Q",
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
 
 # ---------- Top styles ----------
-if {"name", "style", "total_monthly_sales"} <= set(dfv.columns):
-    st.markdown("### Top Styles (by Units)")
+required = {"name", "style", "total_monthly_sales"}
+group_cols = ["name", "style", "sku"]
+
+if required <= set(dfv.columns):
+    if "logo" in dfv.columns:
+        group_cols.insert(0, "logo")  # put logo first in grouping
+
+    st.markdown("### Top Styles by Units")
+
+    agg_dict = {"total_monthly_sales": "sum"}
+    if "vendor_revenue" in dfv.columns:
+        agg_dict["vendor_revenue"] = "sum"
+
     top_styles = (
-        dfv.groupby(["name", "style", "sku"], dropna=False)["total_monthly_sales"]
-           .sum()
-           .sort_values(ascending=False)
+        dfv.groupby(group_cols, dropna=False)
+           .agg(agg_dict)
+           .sort_values("total_monthly_sales", ascending=False)
            .head(25)
            .reset_index()
+           .rename(columns={
+               "total_monthly_sales": "units_sold",
+           })
     )
-    st.dataframe(top_styles, use_container_width=True, hide_index=True)
+
+    column_config = {
+        "units_sold": st.column_config.NumberColumn("Units Sold", format="%d"),
+    }
+    if "vendor_revenue" in top_styles.columns:
+        column_config["vendor_revenue"] = st.column_config.NumberColumn("Vendor Revenue", format="$%d")
+
+    st.dataframe(
+        top_styles,
+        use_container_width=True,
+        hide_index=True,
+        column_config=column_config,
+    )
 
 # ---------- Table preview + download ----------
 with st.expander("Preview (first 200 rows)"):
