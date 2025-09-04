@@ -32,8 +32,10 @@ st.write("""
 This platform provides insights into our ecommerce performance and memo inventory management.
 
 Use the sidebar to navigate between:
+-  **Signet Sales**
 -  **Ecommerce Dashboard**
 -  **Slow Memo Analysis**
+-  **Stock Aging**
 -  **Image Lookup**
 -  **Reverse Image Search**
 
@@ -43,7 +45,7 @@ More dashboards and features are coming soon as I expand the system.
 # --- Highlights / Updates Section ---
 # --- Highlights / Updates Section ---
 st.info(" Reverse Image Search live! Upload any image to find visually similar styles using OpenAI CLIP Machine Learning Model.")
-st.info(" New: Extended cost analysis for ecommerce styles. Image search heavily refined to 97% accuracy.")
+st.info(" New: Stock Aging Analysis. Signet North America sales data now integrated.")
 st.info(" Coming soon: AI capabilities for generating images of jewelry.")
 st.info("For any questions or development suggestions, feel free to email me at rafi@anerijewels.com")
 
