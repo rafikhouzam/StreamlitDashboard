@@ -107,6 +107,9 @@ with st.sidebar:
     sel_buckets = st.multiselect("Aging Bucket (has units in)", bucket_cols)
     text_search = st.text_input("Search in Description")
     min_qty = st.number_input("Min Stock Qty", value=0, min_value=0)
+    max_qty = st.number_input("Max Stock Qty", value=0, min_value=0, help="0 = no max filter")
+    karat_options = ["10K", "14K", "SS"]
+    sel_karats = st.multiselect("Karat", karat_options)
 
 mask = pd.Series(True, index=_df.index)
 if sel_cats:
@@ -115,9 +118,19 @@ if sel_buckets:
     # keep rows that have >0 units in any selected bucket
     mask &= (_df[sel_buckets].sum(axis=1) > 0)
 if text_search:
-    mask &= _df[col_desc].astype(str).str.contains(text_search, case=False, na=False)
+    mask &= (
+        _df[col_desc].astype(str).str.contains(text_search, case=False, na=False) |
+        _df[col_item_id].astype(str).str.contains(text_search, case=False, na=False)
+    )
 if min_qty > 0:
     mask &= (_df[col_qty] >= min_qty)
+if max_qty > 0:
+    mask &= (_df[col_qty] <= max_qty)
+if sel_karats:
+    regex = "|".join(sel_karats)  # build OR regex: "10K|14K"
+    mask &= (
+        _df[col_item_id].astype(str).str.contains(regex, case=False, na=False)
+    )
 
 DF = _df.loc[mask].copy()
 
