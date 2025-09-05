@@ -300,7 +300,7 @@ if required <= set(dfv.columns):
 
 # ---------- Table preview + download ----------
 with st.expander("Preview (first 200 rows)"):
-    st.dataframe(dfv.head(200), width='stretch', hide_index=True)
+    st.dataframe(dfv.head(200), hide_index=True)
 
 st.download_button(
     "Download current view (CSV)",
