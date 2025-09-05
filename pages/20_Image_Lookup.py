@@ -61,13 +61,7 @@ except Exception as e:
 
 
 def safe_image(image_url, caption=None, width=250, height=250):
-    sig = inspect.signature(st.image).parameters
-    if "use_container_width" in sig:
-        st.image(image_url, caption=caption, use_container_width=True)
-    elif "use_column_width" in sig:
-        st.image(image_url, caption=caption, use_column_width=True)
-    else:
-        st.image(image_url, caption=caption, width=width, height=height)
+    st.image(image_url, caption=caption, width='stretch')
 
 # === Search Bar ===
 search_query = st.text_input("Search by Style Number or Description")

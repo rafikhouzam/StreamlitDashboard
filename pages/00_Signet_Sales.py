@@ -134,7 +134,7 @@ if "report_month" in dfv.columns:
            .sort_values("report_month")
     )
     st.markdown("### Monthly Summary")
-    st.dataframe(ms, use_container_width=True, hide_index=True)
+    st.dataframe(ms, width='stretch', hide_index=True)
     if not ms.empty:
         st.bar_chart(ms.set_index("report_month")[["total_sales", "on_hand"]], height=240)
 
@@ -167,7 +167,7 @@ def render_plotly_chart(df: pd.DataFrame, label_col: str, value_col: str, title:
                     value_col: value_col.replace("_", " ").title()},
         )
         fig.update_layout(uniformtext_minsize=8, uniformtext_mode="hide")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     else:  # Pie
         fig = px.pie(
@@ -178,7 +178,7 @@ def render_plotly_chart(df: pd.DataFrame, label_col: str, value_col: str, title:
             hole=0.3,
         )
         fig.update_traces(textinfo="label+percent", hovertemplate="%{label}<br>%{value:,}")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 
 # Units by merch_category (toggle bar/pie)
@@ -234,7 +234,7 @@ if {"logo", "total_monthly_sales"} <= set(dfv.columns):
         },
     )
     fig.update_layout(uniformtext_minsize=8, uniformtext_mode="hide")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 
@@ -243,8 +243,7 @@ if {"style_category", "signet_gross_margin_pct"} <= set(dfv.columns):
         x="style_category:N",
         y="signet_gross_margin_pct:Q",
     )
-    st.altair_chart(chart, use_container_width=True)
-
+    st.altair_chart(chart)
 
 
 # ---------- Top styles ----------
@@ -280,14 +279,14 @@ if required <= set(dfv.columns):
 
     st.dataframe(
         top_styles,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         column_config=column_config,
     )
 
 # ---------- Table preview + download ----------
 with st.expander("Preview (first 200 rows)"):
-    st.dataframe(dfv.head(200), use_container_width=True, hide_index=True)
+    st.dataframe(dfv.head(200), width='stretch', hide_index=True)
 
 st.download_button(
     "Download current view (CSV)",

@@ -181,7 +181,7 @@ def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, 
             "Review": "#6b7280",       # gray
         }
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 # === Build pivots from df_filtered ===
@@ -294,7 +294,7 @@ else:
         hole=0.35,
         title=f"Disposition Mix — {metric}"
     )
-    st.plotly_chart(pie, use_container_width=True)
+    st.plotly_chart(pie, width='stretch')
 
     # Stacked bar by AE
     if not g_ae.empty:
@@ -306,7 +306,7 @@ else:
             barmode="stack",
             title=f"Dispositions by AE — {metric}"
         )
-        st.plotly_chart(bar, use_container_width=True)
+        st.plotly_chart(bar, width='stretch')
 
     hide_unspecified_table = st.checkbox("Show Table of Items Requiring Disposition", value=False)
     pending = df_analytics[df_analytics["_Disposition"] == "Unspecified"]
@@ -321,7 +321,7 @@ else:
                 "Open_Memo_Qty": "{:,}" if "Open_Memo_Qty" in pending.columns else "{:}",
                 "Open_Memo_Amt": "${:,.2f}" if "Open_Memo_Amt" in pending.columns else "{:}",
             }),
-            use_container_width=True
+            width='stretch'
         )
         st.download_button(
             "📥 Download Unspecified Items (CSV)",
@@ -374,7 +374,7 @@ else:
     work_df = df_filtered.copy()
 
 if work_cols:
-    st.dataframe(work_df[work_cols], use_container_width=True)
+    st.dataframe(work_df[work_cols], width='stretch')
     st.download_button(
         "📥 Download Worklist (CSV)",
         data=work_df[work_cols].to_csv(index=False),

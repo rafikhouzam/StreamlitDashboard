@@ -95,7 +95,7 @@ fig1 = px.bar(
     labels={'value': 'Number of Styles', 'style_category': 'Style Category'},
 )
 fig1.update_layout(barmode='stack', height=500)
-st.plotly_chart(fig1, use_container_width=True)
+st.plotly_chart(fig1, width='stretch')
 
 # Visualization 2: Overall Style Performance
 st.subheader("Overall Style Performance")
@@ -119,7 +119,7 @@ fig2.update_layout(
     xaxis=dict(showgrid=True)
 )
 
-st.plotly_chart(fig2, use_container_width=True)
+st.plotly_chart(fig2, width='stretch')
 
 #Visualization 3: Extended Cost Pie Chart by Category
 st.subheader("Extended Cost by Style Category")

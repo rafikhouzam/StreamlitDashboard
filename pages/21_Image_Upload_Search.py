@@ -11,7 +11,7 @@ uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
 # === Search ===
 if uploaded_file:
-    st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
+    st.image(uploaded_file, caption="Uploaded Image", width='stretch')
 
     # Send image to API
     with st.spinner("Searching..."):
@@ -37,7 +37,7 @@ if uploaded_file:
                     if i + j < len(results):
                         result = results[i + j]
                         with col:
-                            st.image(result["image_url"], caption=f'{result["style_cd"]} ({result["similarity"]:.2f})', use_container_width=True)
+                            st.image(result["image_url"], caption=f'{result["style_cd"]} ({result["similarity"]:.2f})', width='stretch')
 
         except requests.exceptions.RequestException as e:
             st.error(f"API Error: {e}")
