@@ -293,7 +293,6 @@ if required <= set(dfv.columns):
 
     st.dataframe(
         top_styles,
-        width='stretch',
         hide_index=True,
         column_config=column_config,
     )
