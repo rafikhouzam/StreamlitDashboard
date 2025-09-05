@@ -119,7 +119,7 @@ k1.metric("Rows", f"{len(dfv):,}")
 k2.metric("Sales Units", f"{sales_units:,}")
 k3.metric("On-hand Units", f"{onhand_units:,}")
 k4.metric("Categories", f"{uniq_cats}")
-k5.metric("Avg Margin %", f"{avg_margin:.1f}%")
+k5.metric("Avg Signet Margin %", f"{avg_margin:.1f}%")
 
 # ---------- Monthly summary ----------
 if "report_month" in dfv.columns:
@@ -134,7 +134,7 @@ if "report_month" in dfv.columns:
            .sort_values("report_month")
     )
     st.markdown("### Monthly Summary")
-    st.dataframe(ms, width='stretch', hide_index=True)
+    st.dataframe(ms,hide_index=True)
     if not ms.empty:
         st.bar_chart(ms.set_index("report_month")[["total_sales", "on_hand"]], height=240)
 

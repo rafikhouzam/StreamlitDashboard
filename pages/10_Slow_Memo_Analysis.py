@@ -148,7 +148,8 @@ st.dataframe(
         "Open_Memo_Amt": "${:,.2f}",
         "Net_Sales_2025_YTD": "${:,.2f}",
         "Expected_Sales_6mo": "{:,}",
-    })
+    }),
+    hide_index=True
 )
 
 
@@ -374,7 +375,7 @@ else:
     work_df = df_filtered.copy()
 
 if work_cols:
-    st.dataframe(work_df[work_cols], width='stretch')
+    st.dataframe(work_df[work_cols], hide_index=True)
     st.download_button(
         "📥 Download Worklist (CSV)",
         data=work_df[work_cols].to_csv(index=False),

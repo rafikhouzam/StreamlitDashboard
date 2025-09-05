@@ -139,8 +139,7 @@ aging_units["% of Total"] = np.where(units_total > 0, aging_units["Units"]/units
 st.bar_chart(aging_units.set_index("Aging_Bucket")["Units"], height=300)
 st.dataframe(
     aging_units.assign(**{"% of Total": (aging_units["% of Total"]*100).round(1).astype(str)+"%"}),
-    hide_index=True,
-    width='stretch',
+    hide_index=True
 )
 
 # -----------------------------
