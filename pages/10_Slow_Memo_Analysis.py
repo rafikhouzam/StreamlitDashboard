@@ -321,8 +321,7 @@ else:
             pending[cols_show].style.format({
                 "Open_Memo_Qty": "{:,}" if "Open_Memo_Qty" in pending.columns else "{:}",
                 "Open_Memo_Amt": "${:,.2f}" if "Open_Memo_Amt" in pending.columns else "{:}",
-            }),
-            width='stretch'
+            })
         )
         st.download_button(
             "📥 Download Unspecified Items (CSV)",

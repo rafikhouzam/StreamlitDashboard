@@ -151,7 +151,7 @@ st.info(f"You have **{units_slow:,.0f} units** sitting more than 180 days.")
 
 slow_df = DF.sort_values("> 180", ascending=False).head(10)[[col_item_id,col_desc,"> 180",col_qty,col_cat]]
 slow_df = slow_df.rename(columns={col_item_id:"Style Number", col_desc:"Description","> 180":"Units >180d", col_qty:"Total Units", col_cat:"Category"})
-st.dataframe(slow_df, hide_index=True, width='stretch')
+st.dataframe(slow_df, hide_index=True)
 
 # -----------------------------
 # Step 4: Category Insights
@@ -169,8 +169,7 @@ by_cat = by_cat.sort_values("% Slow", ascending=False)
 st.bar_chart(by_cat.set_index(col_cat)["% Slow"], height=300)
 st.dataframe(
     by_cat.assign(**{"% Slow": (by_cat["% Slow"]*100).round(1).astype(str)+"%"}),
-    hide_index=True,
-    width='stretch',
+    hide_index=True
 )
 
 # -----------------------------
@@ -188,7 +187,7 @@ missing_summary = DF.groupby(col_cat).agg(
 missing_summary["% rows missing"] = (missing_summary["rows_missing_cost"]/missing_summary["rows_total"]*100).round(1)
 missing_summary["% stock missing"] = (missing_summary["stock_missing_cost"]/missing_summary["stock_total"]*100).round(1)
 
-st.dataframe(missing_summary.reset_index(), width='stretch', hide_index=True)
+st.dataframe(missing_summary.reset_index(), hide_index=True)
 
 # -----------------------------
 # Step 6: Deep Dives
@@ -204,5 +203,4 @@ with st.expander("🔎 Detailed Tables"):
         col_qty:"Total Units","> 180":"Units >180d",
         col_cat:"Category"}
         ),
-        hide_index=True, 
-        width='stretch')
+        hide_index=True)
