@@ -238,13 +238,27 @@ if {"logo", "total_monthly_sales"} <= set(dfv.columns):
 
 
 
-if {"style_category", "signet_gross_margin_pct"} <= set(dfv.columns):
-    chart = alt.Chart(dfv).mark_boxplot().encode(
-        x="style_category:N",
-        y="signet_gross_margin_pct:Q",
-    )
-    st.altair_chart(chart)
+import plotly.express as px
 
+if {"style_category", "signet_gross_margin_pct"} <= set(dfv.columns):
+    fig = px.box(
+        dfv,
+        x="style_category",
+        y="signet_gross_margin_pct",
+        #points="all",   # shows individual points (optional)
+        title="Gross Margin % by Style Category"
+    )
+    
+    # Custom y-axis max
+    fig.update_yaxes(range=[0, 1])
+
+    # Custom axis labels
+    fig.update_layout(
+        yaxis_title="Gross Margin (%)",
+        xaxis_title="Style Category",
+    )
+    
+    st.plotly_chart(fig, width='stretch')
 
 # ---------- Top styles ----------
 required = {"name", "style", "total_monthly_sales"}
