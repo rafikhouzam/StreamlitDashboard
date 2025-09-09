@@ -12,23 +12,25 @@ st.set_page_config(
     layout="wide"
 )
 
+# Load dataset
 @st.cache_data
-def load_api():
+def load_ecomm():
     url = f"https://api.anerijewels.com/api/updated"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
-@st.cache_data
 def load_local():
-    df = pd.read_csv('ecomm_extended_cost_fixed.csv')
-    return df
+    # Fallback to local CSV for testing
+    csv_path = st.secrets["LOCAL_ECOMM_PATH"]
+    return pd.read_csv(csv_path)
 
 try:
-    df_master = load_api()
+    use_local = st.secrets.get("USE_LOCAL_ECOMM_DATA", False)
+    df_master = load_local() if use_local else load_ecomm()
 except Exception as e:
-    st.error("❌ Failed to load Ecomm data.")
+    st.error("❌ Failed to load updated data.")
     st.text(f"Error: {e}")
 
 # Sidebar - Customer selection
@@ -65,7 +67,7 @@ st.sidebar.markdown(
 )
 
 # Filter DataFrame
-df_filtered = df_master[df_master['customer_id'] == customer_selected]
+df_filtered = df_master[df_master['customer'] == customer_selected]
 
 df_filtered = df_filtered.drop_duplicates()
 
@@ -75,10 +77,10 @@ total_sales = df_filtered["sales_amt"].sum()
 profit_pct = total_profit / total_sales * 100 if total_sales > 0 else 0
 
 # KPIs
-st.title(f"{customer_names[customer_selected]} Dashboard (1/1/2023 - 6/9/2025)")
+st.title(f"{customer_names[customer_selected]} Dashboard (1/1/2023 - 9/9/2025)")
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Sales", f"${df_filtered['sales_amt'].sum():,.0f}")
+col1.metric("Total Sales", f"${total_sales:,.0f}")
 col2.metric("Units Sold", f"{df_filtered['sales_qty'].sum():,.0f}")
 col3.metric("Profit Margin", f"{profit_pct:.1f}%")
 col4.metric("Inventory Value", f"${df_filtered['extended_cost'].sum():,.0f}")
