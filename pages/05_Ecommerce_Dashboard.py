@@ -2,7 +2,6 @@
 
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import requests
 import plotly.express as px
 
@@ -12,17 +11,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load dataset
+# ---------------- Load dataset ----------------
 @st.cache_data
 def load_ecomm():
-    url = f"https://api.anerijewels.com/api/updated"
+    url = "https://api.anerijewels.com/api/updated"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
+@st.cache_data
 def load_local():
-    # Fallback to local CSV for testing
     csv_path = st.secrets["LOCAL_ECOMM_PATH"]
     return pd.read_csv(csv_path)
 
@@ -32,152 +31,163 @@ try:
 except Exception as e:
     st.error("❌ Failed to load updated data.")
     st.text(f"Error: {e}")
+    st.stop()
 
-# Sidebar - Customer selection
-customer_names = {
-    'A058': 'AAFES',
-    'JC002': 'JCPenney',
-    'K029': 'Kohls',
-    'MA001': 'Macys',
-    'QV001': 'QVC',
-    'R2002': 'BlueNile - R2NET',
-    'KA002': 'Kay-Jared-Outlet',
-    'ST001': 'Kay-Jared-Outlet',
-    'ST004': 'Kay-Jared-Outlet',
-    'Z011': 'Zales'
-}
+# remove Ben Bridge data since its poor
+df_master = df_master[df_master["customer"] != "Ben Bridge"]
 
-customer_groups = {
-    'AAFES': ['A058'],
-    'JCPenney': ['JC002'],
-    'Kohl’s': ['K029'],
-    'Macy’s': ['MA001'],
-    'QVC': ['QV001'],
-    'BlueNile - R2NET': ['R2002'],
-    'Kay/Jared/Outlet': ['KA002', 'ST001', 'ST004'],
-    'Zales': ['Z011']
-}
-
-customer_codes = list(customer_names.keys())
-customer_selected = st.sidebar.selectbox('Select Customer', customer_codes)
+# ---------------- Sidebar ----------------
+# Use the new dataset's customer names directly
+customers = sorted(df_master["customer"].dropna().unique().tolist())
+customer_selected = st.sidebar.selectbox("Customer", customers)
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
     unsafe_allow_html=True
 )
 
-# Filter DataFrame
-df_filtered = df_master[df_master['customer'] == customer_selected]
-
+# ---------------- Filter & numeric safety ----------------
+df_filtered = df_master[df_master["customer"] == customer_selected].copy()
 df_filtered = df_filtered.drop_duplicates()
 
-# Calculate Profit Margin
-total_profit = df_filtered["profit"].sum()
-total_sales = df_filtered["sales_amt"].sum()
-profit_pct = total_profit / total_sales * 100 if total_sales > 0 else 0
+# Numeric-safe fields (only convert if present)
+for col in ["sales_qty", "sales_amt", "profit", "extended_cost",
+            "avg_unit_price", "avg_unit_cost", "total_inv"]:
+    if col in df_filtered.columns:
+        df_filtered[col] = pd.to_numeric(df_filtered[col], errors="coerce").fillna(0)
 
-# KPIs
-st.title(f"{customer_names[customer_selected]} Dashboard (1/1/2023 - 9/9/2025)")
+# ---------------- KPIs ----------------
+total_sales = df_filtered["sales_amt"].sum() if "sales_amt" in df_filtered else 0
+total_units = df_filtered["sales_qty"].sum() if "sales_qty" in df_filtered else 0
+total_profit = df_filtered["profit"].sum() if "profit" in df_filtered else 0
 
+# Recalculate profit row by row
+if {"sales_amt", "sales_qty", "avg_unit_cost"} <= set(df_filtered.columns):
+    df_filtered["profit_calc"] = df_filtered["sales_amt"] - (df_filtered["sales_qty"] * df_filtered["avg_unit_cost"])
+    total_profit = df_filtered["profit_calc"].sum()
+else:
+    total_profit = df_filtered.get("profit", pd.Series([0])).sum()
+
+profit_pct = (total_profit / total_sales * 100) if total_sales > 0 else 0
+
+inv_value = df_filtered["extended_cost"].sum() if "extended_cost" in df_filtered else 0
+
+st.title(f"{customer_selected} Dashboard (1/1/2023 - 9/9/2025)")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Sales", f"${total_sales:,.0f}")
-col2.metric("Units Sold", f"{df_filtered['sales_qty'].sum():,.0f}")
+col2.metric("Units Sold", f"{total_units:,.0f}")
 col3.metric("Profit Margin", f"{profit_pct:.1f}%")
-col4.metric("Inventory Value", f"${df_filtered['extended_cost'].sum():,.0f}")
+col4.metric("Inventory Value", f"${inv_value:,.0f}")
 
-# Visualization 1: Performance by Style Category
-st.subheader("Performance by Style Category")
+# ---------------- Viz 1: Performance by Style Category ----------------
+if "style_category" in df_filtered.columns and "Performance_Category" in df_filtered.columns:
+    st.subheader("Performance by Style Category")
+    category_summary = (
+        df_filtered.groupby(['style_category', 'Performance_Category'])
+        .size().unstack(fill_value=0)
+    )
+    fig1 = px.bar(
+        category_summary.reset_index(),
+        x='style_category',
+        y=category_summary.columns.tolist(),
+        title=f"{customer_selected} Performance by Style Category",
+        labels={'value': 'Number of Styles', 'style_category': 'Style Category'},
+    )
+    fig1.update_layout(barmode='stack', height=500)
+    st.plotly_chart(fig1, use_container_width=True)
+else:
+    st.info("No `style_category` and/or `Performance_Category` to show category performance.")
 
-category_summary = df_filtered.groupby(['style_category', 'Performance_Category']).size().unstack(fill_value=0)
-fig1 = px.bar(
-    category_summary.reset_index(),
-    x='style_category',
-    y=category_summary.columns.tolist(),
-    title=f"{customer_names[customer_selected]} Performance by Style Category",
-    labels={'value': 'Number of Styles', 'style_category': 'Style Category'},
-)
-fig1.update_layout(barmode='stack', height=500)
-st.plotly_chart(fig1, width='stretch')
-
-# Visualization 2: Overall Style Performance
+# ---------------- Viz 2: Overall Style Performance ----------------
 st.subheader("Overall Style Performance")
+if "Performance_Category" in df_filtered.columns:
+    counts = df_filtered["Performance_Category"].value_counts().sort_values(ascending=True)
+    df_bar = counts.reset_index()
+    df_bar.columns = ['Performance Category', 'Number of Styles']
+    fig2 = px.bar(
+        df_bar,
+        x='Performance Category',
+        y='Number of Styles',
+        title=f"{customer_selected} Overall Style Performance",
+        color_discrete_sequence=['teal']
+    )
+    fig2.update_layout(xaxis=dict(showgrid=True))
+    st.plotly_chart(fig2, use_container_width=True)
+else:
+    st.info("No `Performance_Category` column found.")
 
-category_counts = df_filtered['Performance_Category'].value_counts().sort_values(ascending=True)
-df_bar = category_counts.reset_index()
-df_bar.columns = ['Performance Category', 'Number of Styles']
-
-fig2 = px.bar(
-    df_bar,
-    x='Performance Category',
-    y='Number of Styles',
-    labels={'Performance Category': 'Performance Category', 'Number of Styles': 'Number of Styles'},
-    title=f"{customer_names[customer_selected]} Overall Style Performance",
-    color_discrete_sequence=['teal']
-)
-
-fig2.update_layout(
- #   plot_bgcolor='white',
-  #  xaxis=dict(showgrid=True, gridcolor='lightgray'),
-    xaxis=dict(showgrid=True)
-)
-
-st.plotly_chart(fig2, width='stretch')
-
-#Visualization 3: Extended Cost Pie Chart by Category
+# ---------------- Viz 3: Extended Cost Pie by Category ----------------
 st.subheader("Extended Cost by Style Category")
-category_costs = (
-    df_filtered[df_filtered['extended_cost'].notna()]
-    .groupby('style_category')['extended_cost']
-    .sum()
-    .reset_index()
-    .sort_values(by='extended_cost', ascending=False)
-)
+if "style_category" in df_filtered.columns and "extended_cost" in df_filtered.columns:
+    category_costs = (
+        df_filtered[df_filtered['extended_cost'].notna()]
+        .groupby('style_category')['extended_cost']
+        .sum()
+        .reset_index()
+        .sort_values(by='extended_cost', ascending=False)
+    )
+    if not category_costs.empty:
+        fig_pie = px.pie(
+            category_costs,
+            names='style_category',
+            values='extended_cost',
+            title='Share of Inventory Value by Category'
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+    else:
+        st.info("No extended cost data to plot.")
+else:
+    st.info("Need `style_category` and `extended_cost` to show the pie chart.")
 
-fig_pie = px.pie(
-    category_costs,
-    names='style_category',
-    values='extended_cost',
-    title='Share of Inventory Value by Category'
-)
-st.plotly_chart(fig_pie)
+# ---------------- Viz 4: Top 50 Styles by Inventory Value ----------------
+st.subheader("Top 50 Styles by Inventory Value")
+y_code = 'style_cd' if 'style_cd' in df_filtered.columns else None
+if y_code and "extended_cost" in df_filtered.columns:
+    top_styles = (
+        df_filtered[df_filtered['extended_cost'].notna()]
+        .sort_values(by='extended_cost', ascending=False)
+        .head(50)
+    )
+    fig = px.bar(
+        top_styles,
+        x='extended_cost',
+        y=y_code,
+        orientation='h',
+        title='Top Styles by Inventory Value',
+        labels={'extended_cost': 'Extended Cost ($)', y_code: 'Style Code'},
+        hover_data=[c for c in ['total_inv'] if c in top_styles.columns]
+    )
+    fig.update_layout(yaxis=dict(autorange="reversed"), xaxis_tickformat=',.0f')
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("Need `style_cd` and `extended_cost` to show top styles.")
 
-# Visualization 4: Top 50 Styles by Inventory Value
-top_styles = (
-    df_filtered[df_filtered['extended_cost'].notna()]
-    .sort_values(by='extended_cost', ascending=False)
-    .head(50)
-)
+# ---------------- Inventory Health ----------------
+stock_qty_col = 'total_inv' if 'total_inv' in df_filtered.columns else None
 
-fig = px.bar(
-    top_styles,
-    x='extended_cost',
-    y='style_cd',
-    orientation='h',
-    title='Top Styles by Inventory Value',
-    labels={'extended_cost': 'Extended Cost ($)', 'style_cd': 'Style Code'},
-    hover_data=['Total_Qty']
-)
-
-fig.update_layout(
-    yaxis=dict(autorange="reversed"),  # ensures highest value at the top
-    xaxis_tickformat=',.0f'  # use ',.0s' for '5k', '10k' format instead
-)
-
-st.plotly_chart(fig)
-
-
-# Inventory Health
 st.subheader("⚡ Potential Stockouts (High Opportunity)")
-stockouts = df_filtered[(df_filtered['Total_Qty'] <= 3) & (df_filtered['sales_qty'] >= 5)]
-stockouts_sorted = stockouts.sort_values(by="sales_qty", ascending=False)
-st.dataframe(stockouts_sorted[['style_cd', 'style_category', 'sales_qty',  'sales_amt', 'Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
+if stock_qty_col and "sales_qty" in df_filtered.columns:
+    stockouts = df_filtered[(df_filtered[stock_qty_col] <= 3) & (df_filtered['sales_qty'] >= 5)]
+    stockouts_sorted = stockouts.sort_values(by="sales_qty", ascending=False)
+    cols = [c for c in ['style_cd','style_category','sales_qty','sales_amt',
+                        stock_qty_col,'avg_unit_cost','avg_unit_price','extended_cost']
+            if c in stockouts_sorted.columns]
+    st.dataframe(stockouts_sorted[cols])
+else:
+    st.info("Need `total_inv` and `sales_qty` for stockout analysis.")
 
 st.subheader("❄️ Deadweight Styles (High Inventory, Low Sales)")
-deadweight = df_filtered[(df_filtered['Total_Qty'] >= 5) & (df_filtered['sales_qty'] <= 1)]
-deadweight_sorted = deadweight.sort_values(by="Total_Qty", ascending=False)
-st.dataframe(deadweight_sorted[['style_cd', 'style_category', 'sales_qty','Total_Qty', 'avg_unit_cost', 'avg_unit_price', 'extended_cost']])
+if stock_qty_col and "sales_qty" in df_filtered.columns:
+    deadweight = df_filtered[(df_filtered[stock_qty_col] >= 5) & (df_filtered['sales_qty'] <= 1)]
+    deadweight_sorted = deadweight.sort_values(by=stock_qty_col, ascending=False)
+    cols = [c for c in ['style_cd','style_category','sales_qty',stock_qty_col,
+                        'avg_unit_cost','avg_unit_price','extended_cost']
+            if c in deadweight_sorted.columns]
+    st.dataframe(deadweight_sorted[cols])
+else:
+    st.info("Need `total_inv` and `sales_qty` for deadweight analysis.")
 
-# Download
+# ---------------- Download ----------------
 st.subheader("⬇️ Download Customer Data")
 st.download_button(
     label="Download Filtered Customer CSV",
