@@ -354,7 +354,7 @@ st.download_button(
 st.subheader(" Worklist (Disposition-only)")
 
 work_cols_pref = [
-    "AE", "Customer", "Style", "Style Description",
+    "AE", "Customer", "Style","image_url", "Style Description",
     "Inception Dt.", "RA_Issued", "Performance_Category_New",
     "Disposition", "Comments"
 ]
@@ -382,7 +382,16 @@ else:
     work_df = df_filtered.copy()
 
 if work_cols:
-    st.dataframe(work_df[work_cols], hide_index=True)
+    st.data_editor(
+    work_df[work_cols],
+    hide_index=True,
+    use_container_width=True,
+    column_config={
+        # Example: uncomment or add as needed
+        "image_url": st.column_config.ImageColumn("Image", width="medium")
+    },
+)
+
     st.download_button(
         "📥 Download Worklist (CSV)",
         data=work_df[work_cols].to_csv(index=False),
