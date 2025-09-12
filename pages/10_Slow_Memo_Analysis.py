@@ -120,7 +120,7 @@ sort_display = st.radio(
 # Map the display label back to the real column
 sort_column = sort_columns[sort_display]
 
-# 🔃 Order selector (still native radio for now)
+# Order selector (still native radio for now)
 sort_order = st.radio(
     "Order:",
     options=["Descending", "Ascending"],
@@ -134,7 +134,7 @@ df_sorted = df.sort_values(by=sort_column, ascending=ascending)
 
 # Display top rows (now includes Disposition/Comments if present)
 base_cols = [
-    "AE", "Customer", "Metal Kt", "Style", "Style Description", "Inception Dt.",
+    "AE", "Customer", "Metal Kt", "Style", "image_url", "Style Description", "Inception Dt.",
     "Performance_Category_New"
 ]
 extra_cols = [c for c in ["Disposition", "Comments"] if c in df_sorted.columns]
@@ -142,14 +142,22 @@ metric_cols = ["Open_Memo_Qty", "Open_Memo_Amt", "Net_Sales_2025_YTD", "Expected
 
 cols_to_show = [c for c in (base_cols + extra_cols + metric_cols) if c in df_sorted.columns]
 
-st.dataframe(
-    df_sorted[cols_to_show].style.format({
-        "Open_Memo_Qty": "{:,}",
-        "Open_Memo_Amt": "${:,.2f}",
-        "Net_Sales_2025_YTD": "${:,.2f}",
-        "Expected_Sales_6mo": "{:,}",
-    }),
-    hide_index=True
+# Display with images
+st.data_editor(
+    df_sorted[cols_to_show],
+    hide_index=True,
+    use_container_width=True,
+    column_config={
+        "image_url": st.column_config.ImageColumn(
+            "Image",
+            help="Thumbnail",
+            width="medium"   # can be 'small', 'medium', 'large', or pixel width
+        ),
+        "Open_Memo_Qty": st.column_config.NumberColumn("Open Memo Qty", format="%,d"),
+        "Open_Memo_Amt": st.column_config.NumberColumn("Open Memo Amt", format="$%,.2f"),
+        "Net_Sales_2025_YTD": st.column_config.NumberColumn("Net Sales 2025 YTD", format="$%,.2f"),
+        "Expected_Sales_6mo": st.column_config.NumberColumn("Expected Sales (6mo)", format="%,d"),
+    },
 )
 
 
