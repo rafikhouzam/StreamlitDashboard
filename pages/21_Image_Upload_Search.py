@@ -29,7 +29,6 @@ if uploaded_file:
             results = response.json()["results"]
 
             st.subheader("Top Matches")
-            import streamlit as st
 
             max_results = 12
             cols_per_row = 4
