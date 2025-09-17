@@ -2,8 +2,11 @@ import streamlit as st
 import requests
 from PIL import Image
 
-st.set_page_config(page_title="🔍 Image Upload Search")
-
+st.set_page_config(
+    page_title="Image Upload Search",
+    page_icon="🔎",
+    layout="wide"
+)
 st.title("🔍 Reverse Image Search")
 
 # === Upload ===
