@@ -1,13 +1,13 @@
 .streamlit/secrets.toml
 *.csv
 *.parquet
-utils/*
+utils/
 archives/
 data/
-notebooks/*
+notebooks/
 __pycache__/
 *.ipynb_checkpoints
 *.ipynb
-signet/*
+signet/
 .venv/
 .DS_Store
