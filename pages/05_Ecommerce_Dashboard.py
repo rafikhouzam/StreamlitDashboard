@@ -4,13 +4,14 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
+from utils.navbar import navbar
 
 st.set_page_config(
     page_title="Ecommerce Dashboard",
     page_icon="📦",
     layout="wide"
 )
-
+navbar()
 # ---------------- Load dataset ----------------
 @st.cache_data
 def load_ecomm():

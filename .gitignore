@@ -1,7 +1,7 @@
 .streamlit/secrets.toml
 *.csv
 *.parquet
-utils/
+local_utils/
 archives/
 data/
 notebooks/

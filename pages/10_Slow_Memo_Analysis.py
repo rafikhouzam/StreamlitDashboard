@@ -4,6 +4,7 @@ from datetime import datetime
 import plotly.express as px
 import requests
 from io import BytesIO
+from utils.navbar import navbar
 
 # Page config
 st.set_page_config(
@@ -11,6 +12,7 @@ st.set_page_config(
     page_icon="🪙",
     layout="wide"
 )
+navbar()
 st.title("🪙 Slow Moving Memo Analysis")
 
 # Load dataset

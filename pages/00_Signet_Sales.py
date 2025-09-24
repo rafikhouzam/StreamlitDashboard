@@ -5,8 +5,10 @@ import streamlit as st
 import requests
 import altair as alt
 import plotly.express as px
+from utils.navbar import navbar
 
 st.set_page_config(page_title="Signet Sales", layout="wide")
+navbar()
 
 # ---------- Config ----------
 API_URL = "https://api.anerijewels.com/api/signet"  # FastAPI GET endpoint
