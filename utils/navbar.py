@@ -15,7 +15,3 @@ def navbar():
     cols[1].metric("Silver (USD)", f"${silver:,.2f}")
     cols[2].metric("Platinum (USD)", f"${platinum:,.2f}")
     cols[3].metric("Palladium (USD)", f"${palladium:,.2f}")
-
-    # optional: show when these were last pulled from API
-    last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.caption(f"⏱ Last updated: {last_updated} (API refreshes once daily)")
