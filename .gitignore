@@ -11,3 +11,4 @@ __pycache__/
 signet/
 .venv/
 .DS_Store
+utils/build_image_map.py

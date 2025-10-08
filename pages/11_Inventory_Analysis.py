@@ -13,7 +13,7 @@ st.set_page_config(
     page_icon="🪙",
     layout="wide"
 )
-navbar()
+
 st.title("Inventory Analysis")
 
 # Load dataset
@@ -32,7 +32,7 @@ def load_local():
 
 try:
     use_local = st.secrets.get("USE_LOCAL_INVENTORY_DATA", False)
-    df = load_local() if use_local else load_inventory()
+    df = load_local() if use_local else load_inventory() & navbar()
     #df.shape
 except Exception as e:
     st.error("❌ Failed to load data.")
@@ -121,52 +121,182 @@ if cap_outliers:
 else:
     filtered_viz = filtered
 
+# Department columns relevant for quantity/value computation
+dept_cols = [
+    "SO", "SOSTK", "PR", "PO", "POSM", "WB", "SEMI", "CNTR",
+    "CAST", "QC", "LAB", "INTR", "REP", "VNDR", "SCRP", "CRET",
+    "SCL", "RTS", "OM"
+]
+available_cols = [c for c in dept_cols if c in filtered.columns]
+
+# Compute total quantity and total value for the filtered subset
+filtered = filtered.copy()
+filtered["total_quantity"] = filtered[available_cols].sum(axis=1)
+filtered["total_value"] = filtered["total_quantity"] * filtered["total_cost"]
 
 # ----------------------
 # KPIs (No margin)
 # ----------------------
 
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Styles", f"{len(filtered):,}")
-if "selling_price" in filtered.columns:
-    k2.metric("Median Price", f"${filtered['selling_price'].median():,.2f}")
-    k3.metric("Mean Price", f"${filtered['selling_price'].mean():,.2f}")
-else:
-    k2.metric("Median Price", "—")
-    k3.metric("Mean Price", "—")
-k4.metric("Image Coverage", f"{(filtered['has_image'].mean()*100 if 'has_image' in filtered.columns else 0):.1f}%")
-st.info("Images coming soon")
+k1, k2, k3, k4, k5 = st.columns(5)
+k1.metric("Total Styles", f"{len(filtered):,}")
+k2.metric("Total Pieces", f"{filtered['total_quantity'].sum():,.0f}")
+k3.metric("Avg Cost / Piece", f"${filtered['total_cost'].mean():,.2f}")
+k4.metric("Median Cost / Piece", f"${filtered['total_cost'].median():,.2f}")
+total_value = filtered["total_value"].sum()
+k5.metric("Total Value", f"${total_value:,.0f}")
+
 # ----------------------
 # Tabs
 # ----------------------
-tab_overview, tab_comp, tab_vendor, tab_pricing, tab_drill = st.tabs(
-    ["Overview", "Cost Components", "Vendors", "Pricing Bands", "Style Drilldown"]
+tab_overview, tab_value, tab_comp, tab_dept, tab_costcomp, tab_vendor, tab_pricing, tab_drill = st.tabs(
+    ["Overview", "Value Analysis", "Cost Components", "Department", "Cost Composition", "Vendors", "Pricing Bands", "Style Drilldown"]
 )
 
 # ---- Overview ----
 with tab_overview:
     st.subheader("Distribution by Category & Metal")
     colA, colB = st.columns(2)
-    if "style_category" in filtered.columns:
-        cat_counts = safe_value_counts(filtered, "style_category")
-        colA.dataframe(cat_counts, use_container_width=True)
+    # --- Style Category Summary ---
+    if {"style_category", "total_quantity"}.issubset(filtered.columns):
+        cat_summary = (
+            filtered.groupby("style_category", as_index=False)
+            .agg(
+                Count=("style_cd", "nunique"),
+                Total_Quantity=("total_quantity", "sum")
+            )
+            .sort_values("Total_Quantity", ascending=False)
+        )
+        cat_summary["Total_Quantity"] = cat_summary["Total_Quantity"].round(0).astype(int)
+        colA.dataframe(
+            cat_summary.style.format({"Total_Quantity": "{:,}"}),
+            use_container_width=True,
+        )
     else:
-        colA.info("No style_category column.")
-    if "metal_typ" in filtered.columns:
-        metal_counts = safe_value_counts(filtered, "metal_typ")
-        colB.dataframe(metal_counts, use_container_width=True)
-    else:
-        colB.info("No metal_typ column.")
+        colA.info("No style_category or total_quantity column found.")
 
-    st.markdown("### Top Styles by Price (no cost/margin involved)")
-    if "selling_price" in filtered.columns:
-        top_price = filtered.sort_values("selling_price", ascending=False).head(50)
-        st.dataframe(top_price[["style_cd", "style_category", "metal_typ", "vendor_id", "selling_price"]],
-                     use_container_width=True)
+    # --- Metal Type Summary ---
+    if {"metal_typ", "total_quantity"}.issubset(filtered.columns):
+        metal_summary = (
+            filtered.groupby("metal_typ", as_index=False)
+            .agg(
+                Count=("style_cd", "nunique"),
+                Total_Quantity=("total_quantity", "sum")
+            )
+            .sort_values("Total_Quantity", ascending=False)
+        )
+        metal_summary["Total_Quantity"] = metal_summary["Total_Quantity"].round(0).astype(int)
+        colB.dataframe(
+            metal_summary.style.format({"Total_Quantity": "{:,}"}),
+            use_container_width=True,
+        )
     else:
-        st.info("No selling_price available.")
+        colB.info("No metal_typ or total_quantity column found.")
 
-# ---- Cost Components (absolute, not shares) ----
+
+    st.markdown("### 💎 Top Styles by Value")
+
+    styles = st.number_input(
+        "Number of styles to show",
+        min_value=10,
+        max_value=500,
+        value=100,
+        step=10,
+        key="num_top_styles"
+    )
+
+    if {"total_cost", "selling_price", "total_value", "total_quantity"}.issubset(filtered.columns):
+        top_styles = (
+            filtered[
+                [
+                    "style_cd",
+                    "style_category",
+                    "metal_typ",
+                    "total_quantity",
+                    "selling_price",
+                    "total_cost",
+                    "total_value",
+                ]
+            ]
+            .sort_values("total_value", ascending=False)
+            .head(styles)
+        )
+
+        st.info("💡 Tip: Click any column header to sort by it.")
+
+        st.dataframe(
+            top_styles.style.format({
+                "selling_price": "${:,.2f}",
+                "total_cost": "${:,.2f}",
+                "total_value": "${:,.0f}",
+                "total_quantity": "{:,.0f}"
+            }),
+            use_container_width=True,
+        )
+
+    else:
+        st.info("Required columns ('total_cost', 'selling_price', 'total_value', 'total_quantity') not found.")
+
+with tab_value:
+    st.header("Value Analysis")
+
+    # --- Breakdown by Style Category ---
+    cat_summary = (
+        filtered.groupby("style_category")["total_value"]
+        .sum()
+        .reset_index()
+        .sort_values("total_value", ascending=False)
+    )
+
+    fig_cat = px.bar(
+        cat_summary,
+        x="style_category",
+        y="total_value",
+        title="Total Value by Style Category",
+        text_auto=".2s",
+        template="plotly_white",
+        height=550,
+    )
+    fig_cat.update_traces(textposition="outside")
+    fig_cat.update_layout(
+        xaxis_title="Style Category",
+        yaxis_title="Total Value ($)",
+        uniformtext_minsize=8,
+        uniformtext_mode="hide",
+    )
+    st.plotly_chart(fig_cat, use_container_width=True)
+    
+    # --- Stacked Breakdown by Style Category and Metal Type ---
+    if {"style_category", "metal_typ", "total_value"}.issubset(filtered.columns):
+        cat_metal_summary = (
+            filtered.groupby(["style_category", "metal_typ"], as_index=False)["total_value"]
+            .sum()
+            .sort_values("total_value", ascending=False)
+        )
+
+        fig_cat_metal = px.bar(
+            cat_metal_summary,
+            x="total_value",
+            y="style_category",
+            color="metal_typ",
+            orientation="h",
+            title="Total Value by Style Category and Metal Type",
+            template="plotly_white",
+        )
+        
+        fig_cat_metal.update_layout(
+            xaxis_title="Total Value ($)",
+            yaxis_title=None,
+            legend_title="Metal Type",
+            barmode="stack",
+        )
+
+        st.plotly_chart(fig_cat_metal, use_container_width=True)
+    else:
+        st.info("Required columns ('style_category', 'metal_typ', 'total_value') not found.")
+
+
+# ---- Cost Components ----
 with tab_comp:
     st.subheader("Cost Components (Absolute Values Only)")
     comp_cols = [c for c in ["metal_cost", "diamond_cost", "total_labor_cost"]
@@ -191,6 +321,182 @@ with tab_comp:
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No component columns (metal_cost, diamond_cost, melt_value, total_labor_cost).")
+
+# ---- Department Breakdown ----
+with tab_dept:
+    st.header("Department Breakdown")
+
+    st.caption("Analyze total inventory value distribution across departments and style categories.")
+
+    # --- Department Mapping ---
+    dept_mapping = {
+        "SO": "Sales Order",
+        "SOSTK": "Sales Order Stock",
+        "PR": "Production Request",
+        "PO": "Purchase Order",
+        "POSM": "Purchase Order Semi Mount",
+        "WB": "Workbag",
+        "SEMI": "Semi Mount",
+        "CNTR": "Contractor",
+        "CAST": "Casting",
+        "QC": "QC",
+        "LAB": "LAB",
+        "INTR": "In Transit",
+        "REP": "Repair",
+        "VNDR": "Vendor",
+        "SCRP": "Scrap",
+        "CRET": "CRET",
+        "SCL": "Sales Closeout",
+        "RTS": "RTS",
+        "OM": "Open Memo",
+        # "TSHP": "To Ship"  # excluded per your note
+    }
+
+    # --- Filters ---
+    st.sidebar.header("Filters")
+    style_filter = st.sidebar.multiselect(
+        "Filter by Style Category",
+        sorted(filtered["style_category"].unique()),
+        default=None
+    )
+    filtered = (
+        filtered[filtered["style_category"].isin(style_filter)]
+        if style_filter else filtered
+    )
+
+    # --- Determine which dept columns exist ---
+    available_cols = [c for c in dept_mapping.keys() if c in filtered.columns]
+
+    if available_cols:
+        # --- Compute Total Value per Department & Style Category ---
+        dept_style_data = []
+        for dept in available_cols:
+            tmp = (
+                filtered
+                .groupby("style_category", as_index=False)
+                .apply(lambda g: (g[dept] * g["total_cost"]).sum())
+                .reset_index()
+            )
+            tmp.columns = ["_", "style_category", "Total Value"]
+            tmp["Department"] = dept
+            dept_style_data.append(tmp[["Department", "style_category", "Total Value"]])
+
+        dept_style_df = pd.concat(dept_style_data, ignore_index=True)
+        dept_style_df["Full Name"] = dept_style_df["Department"].map(dept_mapping)
+
+        # --- Aggregate for Department Totals ---
+        dept_summary = (
+            dept_style_df.groupby(["Department", "Full Name"], as_index=False)["Total Value"]
+            .sum()
+            .sort_values("Total Value", ascending=False)
+        )
+        dept_summary["% of Total"] = (
+            dept_summary["Total Value"] / dept_summary["Total Value"].sum() * 100
+        ).round(2)
+
+        # --- Visualization: Stacked Bar by Style Category ---
+        fig_stacked = px.bar(
+            dept_style_df,
+            x="Total Value",
+            y="Full Name",
+            color="style_category",
+            orientation="h",
+            title="Total Value by Department (Stacked by Style Category)",
+            template="plotly_white",
+        )
+        fig_stacked.update_layout(
+            xaxis_title="Total Value ($)",
+            yaxis_title=None,
+            legend_title="Style Category",
+            barmode="stack",
+        )
+        st.plotly_chart(fig_stacked, use_container_width=True)
+
+        # --- Table Summary ---
+        st.subheader("Department Summary")
+        st.dataframe(
+            dept_summary[["Department", "Total Value", "% of Total"]]
+            .style.format({"Total Value": "${:,.0f}", "% of Total": "{:.2f}%"}),
+            use_container_width=True,
+        )
+
+        # --- Legend ---
+        with st.expander("View Department Legend"):
+            legend_df = pd.DataFrame.from_dict(
+                dept_mapping, orient="index", columns=["Full Name"]
+            ).reset_index().rename(columns={"index": "Abbreviation"})
+            st.dataframe(legend_df, use_container_width=True)
+
+    else:
+        st.warning("No department columns found in dataset. Please verify column names.")
+
+# ---- Cost Composition Breakdown ----
+# ---- Cost Composition Breakdown ----
+with tab_costcomp:
+    st.header("💵 Cost Composition Breakdown")
+
+    st.caption("Interactive cost breakdown by style. Toggle cost components to see adjusted totals.")
+
+    # --- Define columns ---
+    base_cols = ["dept", "style_cd", "style_desc", "total_metal_wt", "diamond_wt"]
+    cost_cols = [
+        "metal_cost",
+        "diamond_cost",
+        "total_labor_cost",
+        "costfor_duty1",
+        "finding_cost",  # placeholder for when you add it
+        "image_cost",    # placeholder for when you add it
+    ]
+
+    # --- Build a local working copy (no mutation) ---
+    df_local = filtered.copy(deep=True)
+
+    available_cols = [c for c in cost_cols if c in df_local.columns]
+
+    # --- Column selector ---
+    selected_costs = st.multiselect(
+        "Select cost components to include in total:",
+        available_cols,
+        default=available_cols,
+    )
+
+    # --- Compute total dynamically (on copy only) ---
+    if selected_costs:
+        numeric_subset = df_local[selected_costs].select_dtypes(include=["number"])
+        df_local["Total_Amount"] = numeric_subset.sum(axis=1)
+    else:
+        df_local["Total_Amount"] = 0
+
+    # --- Build final display table ---
+    cols_to_display = [c for c in base_cols if c in df_local.columns] + selected_costs + ["Total_Amount"]
+    table = df_local[cols_to_display].copy()
+
+    # --- Subtotals row (computed from numeric columns only) ---
+    subtotal = table.select_dtypes(include=["number"]).sum().to_frame().T
+    subtotal.index = ["Subtotal"]
+    for c in ["dept", "style_cd", "style_desc"]:
+        if c in table.columns:
+            subtotal[c] = ""
+    table_with_total = pd.concat([table, subtotal], ignore_index=True)
+
+    # --- Formatting ---
+    numeric_fmt = {
+        "total_metal_wt": "{:,.2f}",
+        "diamond_wt": "{:,.2f}",
+        "metal_cost": "${:,.2f}",
+        "diamond_cost": "${:,.2f}",
+        "total_labor_cost": "${:,.2f}",
+        "finding_cost": "${:,.2f}",
+        "costfor_duty1": "${:,.2f}",
+        "image_cost": "${:,.2f}",
+        "Total_Amount": "${:,.2f}",
+    }
+
+    st.dataframe(
+        table_with_total.style.format(numeric_fmt, na_rep="-"),
+        use_container_width=True,
+    )
+
 
 # ---- Vendors ----
 with tab_vendor:
@@ -247,51 +553,6 @@ with tab_pricing:
     else:
         st.info("No selling_price column.")
 
-# ---- QA / Staleness ----
-# with tab_qa:
-#     st.subheader("Data Quality & Staleness")
-#     issues = {}
-#     if "style_cd" in filtered.columns:
-#         issues["blank_style_cd"] = int((filtered["style_cd"].astype(str).str.strip() == "").sum())
-#     if "selling_price" in filtered.columns:
-#         issues["missing_price"] = int(filtered["selling_price"].isna().sum())
-#         issues["zero_or_negative_price"] = int((filtered["selling_price"] <= 0).sum())
-#     #if "style_photo" in filtered.columns:
-#         #issues["missing_image"] = int((filtered["has_image"] == False).sum())
-
-#     if "days_since_update" in filtered.columns and filtered["days_since_update"].notna().any():
-#         stale = filtered["days_since_update"] > stale_threshold
-#         issues["stale_styles"] = int(stale.sum())
-#         st.metric(f"Stale Styles (>{stale_threshold} days)", f"{issues['stale_styles']:,}")
-#         fig = px.histogram(filtered, x="days_since_update", nbins=40, title="Days Since Last Update")
-#         st.plotly_chart(fig, use_container_width=True)
-
-#     if "lock_active" in filtered.columns:
-#         st.metric("Lock Active", f"{int(filtered['lock_active'].sum()):,} styles")
-
-#     st.markdown("#### Issue Counts")
-#     st.json(issues)
-
-#     flagged = filtered.copy()
-#     masks = []
-#     if "style_cd" in flagged.columns:
-#         masks.append(flagged["style_cd"].astype(str).str.strip() == "")
-#     if "selling_price" in flagged.columns:
-#         masks.append(flagged["selling_price"].isna() | (flagged["selling_price"] <= 0))
-#     if "has_image" in flagged.columns:
-#         masks.append(flagged["has_image"] == False)
-#     if "days_since_update" in flagged.columns and flagged["days_since_update"].notna().any():
-#         masks.append(flagged["days_since_update"] > stale_threshold)
-#     if "lock_active" in flagged.columns:
-#         masks.append(flagged["lock_active"])
-
-#     if masks:
-#         bad = flagged[np.column_stack(masks).any(axis=1)] if len(masks) > 1 else flagged[masks[0]]
-#         st.download_button("⬇️ Download Flagged Styles (CSV)",
-#                            bad.to_csv(index=False).encode("utf-8"),
-#                            file_name="flagged_styles.csv",
-#                            mime="text/csv")
-
 # ---- Style Drilldown ----
 with tab_drill:
     st.subheader("Style Drilldown")
@@ -304,6 +565,4 @@ with tab_drill:
     cols = [c for c in ["style_cd", "style_desc", "style_category", "metal_typ", "vendor_id",
                         "selling_price", "metal_cost", "diamond_cost", "total_labor_cost",
                         "melt_value"] if c in filtered.columns]
-    st.dataframe(qdf[cols], use_container_width=True)
-    
-st.caption("Note: No margin or total_cost calculations. This app focuses on inventory mix, pricing distributions, vendor/category breakdowns, locks, and data quality.")
+    st.dataframe(qdf[cols], use_container_width=True)    
