@@ -1,10 +1,8 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import plotly.express as px
 import numpy as np
 import requests
-from io import BytesIO
 from utils.navbar import navbar
 
 # Page config
@@ -32,12 +30,18 @@ def load_local():
 
 try:
     use_local = st.secrets.get("USE_LOCAL_INVENTORY_DATA", False)
-    df = load_local() if use_local else load_inventory() & navbar()
-    #df.shape
+
+    if use_local:
+        df = load_local()
+    else:
+        df = load_inventory()
+        navbar()
+
 except Exception as e:
     st.error("❌ Failed to load data.")
     st.text(f"Error: {e}")
     st.stop()
+
 
 # ----------------------
 # Helpers & Config
@@ -55,6 +59,13 @@ NUMERIC_COLS_CANDIDATES = [
     "center1_min", "center2_min", "center3_min",
 ]
 LOCK_COLS = ["gold_lock", "silver_lock", "platinum_lock", "palladium_lock"]
+
+# Department columns relevant for quantity/value computation
+dept_cols = [
+    "SO", "SOSTK", "PR", "PO", "POSM", "WB", "SEMI", "CNTR",
+    "CAST", "QC", "LAB", "INTR", "REP", "VNDR", "SCRP", "CRET",
+    "SCL", "RTS", "OM"
+]
 
 def coerce_numeric(df: pd.DataFrame, columns):
     for c in columns:
@@ -87,10 +98,13 @@ st.sidebar.header("Filters")
 
 cats = sorted(df["style_category"].dropna().unique()) if "style_category" in df.columns else []
 metals = sorted(df["metal_typ"].dropna().unique()) if "metal_typ" in df.columns else []
+deps = sorted([c for c in dept_cols if c in df.columns])
+
 #vendors = sorted(df["vendor_id"].dropna().unique()) if "vendor_id" in df.columns else []
 
 sel_cats = st.sidebar.multiselect("Category", cats, default=cats)
 sel_metals = st.sidebar.multiselect("Metal Type", metals, default=metals)
+sel_deps = st.sidebar.multiselect("Departments", deps, default=deps)
 #sel_vendors = st.sidebar.multiselect("Vendor", vendors, default=vendors)
 
 if "selling_price" in df.columns and df["selling_price"].notna().any():
@@ -109,6 +123,8 @@ if sel_cats:
     filtered = filtered[filtered["style_category"].isin(sel_cats)]
 if sel_metals:
     filtered = filtered[filtered["metal_typ"].isin(sel_metals)]
+if sel_deps:
+    filtered = filtered[filtered[sel_deps].sum(axis=1) > 0]
 #if sel_vendors:
     #filtered = filtered[filtered["vendor_id"].isin(sel_vendors)]
 if "selling_price" in filtered.columns and pr_hi > 0:
@@ -121,12 +137,6 @@ if cap_outliers:
 else:
     filtered_viz = filtered
 
-# Department columns relevant for quantity/value computation
-dept_cols = [
-    "SO", "SOSTK", "PR", "PO", "POSM", "WB", "SEMI", "CNTR",
-    "CAST", "QC", "LAB", "INTR", "REP", "VNDR", "SCRP", "CRET",
-    "SCL", "RTS", "OM"
-]
 available_cols = [c for c in dept_cols if c in filtered.columns]
 
 # Compute total quantity and total value for the filtered subset
@@ -150,7 +160,7 @@ k5.metric("Total Value", f"${total_value:,.0f}")
 # Tabs
 # ----------------------
 tab_overview, tab_value, tab_comp, tab_dept, tab_costcomp, tab_vendor, tab_pricing, tab_drill = st.tabs(
-    ["Overview", "Value Analysis", "Cost Components", "Department", "Cost Composition", "Vendors", "Pricing Bands", "Style Drilldown"]
+    ["Overview", "Value Analysis", "Cost Components", "Department", "Cost Composition", "Vendors", "Pricing Bands", "Style Search"]
 )
 
 # ---- Overview ----
@@ -194,7 +204,7 @@ with tab_overview:
         colB.info("No metal_typ or total_quantity column found.")
 
 
-    st.markdown("### 💎 Top Styles by Value")
+    st.subheader("Top Styles by Value")
 
     styles = st.number_input(
         "Number of styles to show",
@@ -295,7 +305,6 @@ with tab_value:
     else:
         st.info("Required columns ('style_category', 'metal_typ', 'total_value') not found.")
 
-
 # ---- Cost Components ----
 with tab_comp:
     st.subheader("Cost Components (Absolute Values Only)")
@@ -351,18 +360,6 @@ with tab_dept:
         "OM": "Open Memo",
         # "TSHP": "To Ship"  # excluded per your note
     }
-
-    # --- Filters ---
-    st.sidebar.header("Filters")
-    style_filter = st.sidebar.multiselect(
-        "Filter by Style Category",
-        sorted(filtered["style_category"].unique()),
-        default=None
-    )
-    filtered = (
-        filtered[filtered["style_category"].isin(style_filter)]
-        if style_filter else filtered
-    )
 
     # --- Determine which dept columns exist ---
     available_cols = [c for c in dept_mapping.keys() if c in filtered.columns]
@@ -431,9 +428,8 @@ with tab_dept:
         st.warning("No department columns found in dataset. Please verify column names.")
 
 # ---- Cost Composition Breakdown ----
-# ---- Cost Composition Breakdown ----
 with tab_costcomp:
-    st.header("💵 Cost Composition Breakdown")
+    st.header("Cost Composition Breakdown")
 
     st.caption("Interactive cost breakdown by style. Toggle cost components to see adjusted totals.")
 
@@ -444,8 +440,8 @@ with tab_costcomp:
         "diamond_cost",
         "total_labor_cost",
         "costfor_duty1",
-        "finding_cost",  # placeholder for when you add it
-        "image_cost",    # placeholder for when you add it
+        "finding_cost",  # placeholder
+        "image_cost",    # placeholder
     ]
 
     # --- Build a local working copy (no mutation) ---
@@ -482,8 +478,8 @@ with tab_costcomp:
     # --- Formatting ---
     numeric_fmt = {
         "total_metal_wt": "{:,.2f}",
-        "diamond_wt": "{:,.2f}",
         "metal_cost": "${:,.2f}",
+        "diamond_wt": "{:,.2f}",
         "diamond_cost": "${:,.2f}",
         "total_labor_cost": "${:,.2f}",
         "finding_cost": "${:,.2f}",
@@ -496,7 +492,6 @@ with tab_costcomp:
         table_with_total.style.format(numeric_fmt, na_rep="-"),
         use_container_width=True,
     )
-
 
 # ---- Vendors ----
 with tab_vendor:
