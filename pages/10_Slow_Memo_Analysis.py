@@ -55,9 +55,9 @@ if metal_selected:
     df = df[df["Metal Kt"].isin(metal_selected)]
 
 # Filter: Performance Category
-performance_selected = st.sidebar.multiselect("Performance Category", df["Performance_Category_New"].unique())
+performance_selected = st.sidebar.multiselect("Performance Category", df["Performance_Category"].unique())
 if performance_selected:
-    df = df[df["Performance_Category_New"].isin(performance_selected)]
+    df = df[df["Performance_Category"].isin(performance_selected)]
 
 # --- Disposition filter (normalized) ---
 def _normalize_disposition(s: pd.Series) -> pd.Series:
@@ -96,11 +96,11 @@ st.sidebar.markdown(
 # === KPI Display ===
 st.subheader("🔢 Key Metrics")
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 col1.metric("Total Styles", f"{len(df):,}")
-col2.metric("Dead Weight", f"{(df['Performance_Category_New'] == 'Dead Weight').sum():,}")
-col3.metric("Slow Movers", f"{(df['Performance_Category_New'] == 'Slow Mover').sum():,}")
-col4.metric("Review", f"{(df['Performance_Category_New'] == 'Review').sum():,}")
+col2.metric("Open Memo Quantity", f"{(df['Open_Memo_Qty']).sum():,}")
+col3.metric("Open Memo Value", f"${(df['Open_Memo_Amt']).sum():,.0f}")
+
 
 # === Display Sorted Table ===
 st.subheader("Detailed Memo Table (Sorted)")
@@ -137,12 +137,13 @@ df_sorted = df.sort_values(by=sort_column, ascending=ascending)
 # Display top rows (now includes Disposition/Comments if present)
 base_cols = [
     "AE", "Customer", "Metal Kt", "Style", "image_url", "Style Description", "Inception Dt.",
-    "Performance_Category_New"
+    "Performance_Category"
 ]
 extra_cols = [c for c in ["Disposition", "Comments"] if c in df_sorted.columns]
 metric_cols = ["Open_Memo_Qty", "Open_Memo_Amt", "Net_Sales_2025_YTD", "Expected_Sales_6mo"]
 
 cols_to_show = [c for c in (base_cols + extra_cols + metric_cols) if c in df_sorted.columns]
+
 
 # Display with images
 st.data_editor(
@@ -153,12 +154,24 @@ st.data_editor(
         "image_url": st.column_config.ImageColumn(
             "Image",
             help="Thumbnail",
-            width="medium"   # can be 'small', 'medium', 'large', or pixel width
+            width="medium"
         ),
-        "Open_Memo_Qty": st.column_config.NumberColumn("Open Memo Qty", format="%,d"),
-        "Open_Memo_Amt": st.column_config.NumberColumn("Open Memo Amt", format="$%,.2f"),
-        "Net_Sales_2025_YTD": st.column_config.NumberColumn("Net Sales 2025 YTD", format="$%,.2f"),
-        "Expected_Sales_6mo": st.column_config.NumberColumn("Expected Sales (6mo)", format="%,d"),
+        "Open_Memo_Qty": st.column_config.NumberColumn(
+            "Open Memo Qty",
+            format=None 
+        ),
+        "Open_Memo_Amt": st.column_config.NumberColumn(
+            "Open Memo Amt ($)",
+            format="dollar"  
+        ),
+        "Net_Sales_2025_YTD": st.column_config.NumberColumn(
+            "Net Sales 2025 YTD ($)",
+            format="dollar"
+        ),
+        "Expected_Sales_6mo": st.column_config.NumberColumn(
+            "Expected Sales (6mo)",
+            format=None
+        ),
     },
 )
 
@@ -198,7 +211,7 @@ def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, 
 # === Build pivots from df_filtered ===
 if "AE" in df_filtered.columns:
     ae_pivot = df_filtered.pivot_table(
-        index="AE", columns="Performance_Category_New", values="Style", aggfunc="size", fill_value=0
+        index="AE", columns="Performance_Category", values="Style", aggfunc="size", fill_value=0
     )
     ae_group_sorted = ae_pivot.assign(Total=ae_pivot.sum(axis=1)).sort_values("Total", ascending=False)
     stacked_bar_from_pivot(ae_group_sorted, "AE", "AEs by Performance Category", top_n=None)
@@ -207,7 +220,7 @@ top_n = st.slider("Top N Customers", 5, 20, 10, step=1)
 
 if "Customer" in df_filtered.columns:
     customer_pivot = df_filtered.pivot_table(
-        index="Customer", columns="Performance_Category_New", values="Style", aggfunc="size", fill_value=0
+        index="Customer", columns="Performance_Category", values="Style", aggfunc="size", fill_value=0
     )
     customer_group_sorted = customer_pivot.assign(Total=customer_pivot.sum(axis=1)).sort_values("Total", ascending=False)
     stacked_bar_from_pivot(customer_group_sorted, "Customer", "Top Customers by Count", top_n=top_n)
@@ -357,7 +370,7 @@ st.subheader(" Worklist (Disposition-only)")
 
 work_cols_pref = [
     "AE", "Customer", "Style","image_url", "Style Description",
-    "Inception Dt.", "RA_Issued", "Performance_Category_New",
+    "Inception Dt.", "RA_Issued", "Performance_Category",
     "Disposition", "Comments"
 ]
 work_cols = [c for c in work_cols_pref if c in df_filtered.columns]

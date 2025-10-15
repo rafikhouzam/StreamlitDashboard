@@ -434,7 +434,13 @@ with tab_costcomp:
     st.caption("Interactive cost breakdown by style. Toggle cost components to see adjusted totals.")
 
     # --- Define columns ---
-    base_cols = ["dept", "style_cd", "style_desc", "total_metal_wt", "diamond_wt"]
+    base_cols = [
+        "dept", 
+        "style_cd", 
+        "style_desc", 
+        "total_metal_wt",
+        "diamond_wt",
+        "total_quantity"]
     cost_cols = [
         "metal_cost",
         "diamond_cost",
@@ -477,6 +483,7 @@ with tab_costcomp:
 
     # --- Formatting ---
     numeric_fmt = {
+        "total_quantity": "{:,.0f}",
         "total_metal_wt": "{:,.2f}",
         "metal_cost": "${:,.2f}",
         "diamond_wt": "{:,.2f}",
