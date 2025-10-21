@@ -102,10 +102,30 @@ deps = sorted([c for c in dept_cols if c in df.columns])
 
 #vendors = sorted(df["vendor_id"].dropna().unique()) if "vendor_id" in df.columns else []
 
-sel_cats = st.sidebar.multiselect("Category", cats, default=cats)
-sel_metals = st.sidebar.multiselect("Metal Type", metals, default=metals)
-sel_deps = st.sidebar.multiselect("Departments", deps, default=deps)
-#sel_vendors = st.sidebar.multiselect("Vendor", vendors, default=vendors)
+# --- Sidebar Filters with "All" Option ---
+
+# 1️⃣ Category filter
+all_cats = ["All"] + cats
+sel_cats = st.sidebar.multiselect("Category", all_cats, default=["All"])
+if ("All" in sel_cats) or (not sel_cats):
+    sel_cats = cats
+
+# 2️⃣ Metal Type filter
+all_metals = ["All"] + metals
+sel_metals = st.sidebar.multiselect("Metal Type", all_metals, default=["All"])
+if ("All" in sel_metals) or (not sel_metals):
+    sel_metals = metals
+
+# 3️⃣ Department filter
+all_deps = ["All"] + deps
+sel_deps = st.sidebar.multiselect("Departments", all_deps, default=["All"])
+if ("All" in sel_deps) or (not sel_deps):
+    sel_deps = deps
+# 4️⃣ Vendor filter
+#all_vendors = ["All"] + vendors
+#sel_vendors = st.sidebar.multiselect("Vendor", all_vendors, default=["All"])
+#if ("All" in sel_vendors) or (not sel_vendors):
+#    sel_vendors = vendors``
 
 if "selling_price" in df.columns and df["selling_price"].notna().any():
     pr_lo, pr_hi = st.sidebar.slider("Selling Price Range",
@@ -124,7 +144,10 @@ if sel_cats:
 if sel_metals:
     filtered = filtered[filtered["metal_typ"].isin(sel_metals)]
 if sel_deps:
-    filtered = filtered[filtered[sel_deps].sum(axis=1) > 0]
+    dep_num = filtered[sel_deps].apply(pd.to_numeric, errors="coerce")
+    # choose > 0 to ignore negatives/returns, or != 0 to include them
+    mask = dep_num.fillna(0).ne(0).any(axis=1)  # (ne(0) == != 0)
+    filtered = filtered[mask]
 #if sel_vendors:
     #filtered = filtered[filtered["vendor_id"].isin(sel_vendors)]
 if "selling_price" in filtered.columns and pr_hi > 0:
@@ -139,9 +162,13 @@ else:
 
 available_cols = [c for c in dept_cols if c in filtered.columns]
 
+# Coerce *all* available dept columns to numeric for correct summing
+dep_all_num = filtered[available_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
+
 # Compute total quantity and total value for the filtered subset
 filtered = filtered.copy()
-filtered["total_quantity"] = filtered[available_cols].sum(axis=1)
+dep_num = filtered[sel_deps].apply(pd.to_numeric, errors="coerce").fillna(0)
+filtered["total_quantity"] = dep_num.sum(axis=1)
 filtered["total_value"] = filtered["total_quantity"] * filtered["total_cost"]
 
 # ----------------------
@@ -334,7 +361,6 @@ with tab_comp:
 # ---- Department Breakdown ----
 with tab_dept:
     st.header("Department Breakdown")
-
     st.caption("Analyze total inventory value distribution across departments and style categories.")
 
     # --- Department Mapping ---
@@ -358,20 +384,25 @@ with tab_dept:
         "SCL": "Sales Closeout",
         "RTS": "RTS",
         "OM": "Open Memo",
-        # "TSHP": "To Ship"  # excluded per your note
+        # "TSHP": "To Ship"
     }
 
-    # --- Determine which dept columns exist ---
+    # --- Determine which department columns to use ---
     available_cols = [c for c in dept_mapping.keys() if c in filtered.columns]
 
-    if available_cols:
+    # Respect the sidebar filter: use only selected departments that exist in filtered
+    active_deps = [d for d in sel_deps if d in available_cols]
+
+    if not active_deps:
+        st.warning("No matching department columns found for your current selection.")
+    else:
         # --- Compute Total Value per Department & Style Category ---
         dept_style_data = []
-        for dept in available_cols:
+        for dept in active_deps:
             tmp = (
                 filtered
                 .groupby("style_category", as_index=False)
-                .apply(lambda g: (g[dept] * g["total_cost"]).sum())
+                .apply(lambda g: (pd.to_numeric(g[dept], errors="coerce").fillna(0) * g["total_cost"]).sum())
                 .reset_index()
             )
             tmp.columns = ["_", "style_category", "Total Value"]
@@ -423,9 +454,6 @@ with tab_dept:
                 dept_mapping, orient="index", columns=["Full Name"]
             ).reset_index().rename(columns={"index": "Abbreviation"})
             st.dataframe(legend_df, use_container_width=True)
-
-    else:
-        st.warning("No department columns found in dataset. Please verify column names.")
 
 # ---- Cost Composition Breakdown ----
 with tab_costcomp:
