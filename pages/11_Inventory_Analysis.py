@@ -537,6 +537,38 @@ with tab_costcomp:
         use_container_width=True,
     )
 
+    # --- Totals × Quantity ---
+    st.subheader("Totals × Quantity")
+
+    selected_costs_2 = st.multiselect(
+        "Select cost components to include (for totals × quantity):",
+        available_cols,
+        default=available_cols,
+        key="cost_selector_2"
+    )
+
+    cols_to_display_2 = [c for c in base_cols if c in df_local.columns] + selected_costs_2 + ["Total_Amount"]
+    table_2 = df_local[cols_to_display_2].copy()
+
+    # Multiply cost components & total by quantity
+    for col in selected_costs_2 + ["Total_Amount"]:
+        table_2[col] = pd.to_numeric(table_2[col], errors="coerce").fillna(0) * table_2["total_quantity"]
+
+    # Subtotal row
+    subtotal_values_2 = table_2.select_dtypes(include=["number"]).sum()
+    subtotal_2 = pd.DataFrame([subtotal_values_2], columns=subtotal_values_2.index)
+    subtotal_2.index = ["Subtotal"]
+    for c in table_2.columns:
+        if c not in subtotal_2.columns:
+            subtotal_2[c] = ""
+    subtotal_2 = subtotal_2[table_2.columns]
+    table_2_final = pd.concat([subtotal_2, table_2], ignore_index=True)
+
+    st.dataframe(
+        table_2_final.style.format(numeric_fmt, na_rep="-"),
+        use_container_width=True,
+    )
+
 # ---- Vendors ----
 with tab_vendor:
     st.subheader("Vendor Summary")
