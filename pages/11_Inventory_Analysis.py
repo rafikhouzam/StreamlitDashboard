@@ -501,13 +501,22 @@ with tab_costcomp:
     cols_to_display = [c for c in base_cols if c in df_local.columns] + selected_costs + ["Total_Amount"]
     table = df_local[cols_to_display].copy()
 
-    # --- Subtotals row (computed from numeric columns only) ---
-    subtotal = table.select_dtypes(include=["number"]).sum().to_frame().T
+    # --- Subtotals row (aligned with all columns) ---
+    subtotal_values = table.select_dtypes(include=["number"]).sum()
+    subtotal = pd.DataFrame([subtotal_values], columns=subtotal_values.index)
     subtotal.index = ["Subtotal"]
-    for c in ["dept", "style_cd", "style_desc"]:
-        if c in table.columns:
+
+    # Add missing non-numeric columns with blanks (ensures same order)
+    for c in table.columns:
+        if c not in subtotal.columns:
             subtotal[c] = ""
-    table_with_total = pd.concat([table, subtotal], ignore_index=True)
+
+    # Reorder subtotal columns to match table
+    subtotal = subtotal[table.columns]
+
+    # Place subtotal at top
+    table_with_total = pd.concat([subtotal, table], ignore_index=True)
+
 
     # --- Formatting ---
     numeric_fmt = {
