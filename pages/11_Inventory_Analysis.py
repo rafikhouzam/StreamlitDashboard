@@ -12,30 +12,40 @@ st.set_page_config(
     layout="wide"
 )
 
+use_local = st.secrets.get("USE_LOCAL_INVENTORY_DATA", False)
+if not use_local:
+    navbar()
+
 st.title("Inventory Analysis")
+
+unit = st.selectbox("Select Business Unit", ["Sumit", "EDB", "Newlite"])
 
 # Load dataset
 @st.cache_data
-def load_inventory():
-    url = f"https://api.anerijewels.com/api/inventory"
+def load_inventory(unit):
+    url = f"https://api.anerijewels.com/api/inventory?unit={unit.lower()}"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     res = requests.get(url, headers=headers)
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
-def load_local():
-    # Fallback to local CSV for testing
-    csv_path = st.secrets["LOCAL_INVENTORY_PATH"]
+def load_local(unit):
+    if unit == "Sumit":
+        csv_path = st.secrets["LOCAL_INVENTORY_SUMIT_PATH"]
+    elif unit == "EDB":
+        csv_path = st.secrets["LOCAL_INVENTORY_EDB_PATH"]
+    elif unit == "Newlite":
+        csv_path = st.secrets["LOCAL_INVENTORY_NEWLITE_PATH"]
+    else:
+        st.write("Please select business unit to begin.")
     return pd.read_csv(csv_path)
 
 try:
-    use_local = st.secrets.get("USE_LOCAL_INVENTORY_DATA", False)
-
     if use_local:
-        df = load_local()
+        df = load_local(unit)
     else:
-        df = load_inventory()
-        navbar()
+        df = load_inventory(unit)
+
 
 except Exception as e:
     st.error("❌ Failed to load data.")
@@ -335,28 +345,57 @@ with tab_value:
 # ---- Cost Components ----
 with tab_comp:
     st.subheader("Cost Components (Absolute Values Only)")
-    comp_cols = [c for c in ["metal_cost", "diamond_cost", "total_labor_cost"]
-                 if c in filtered.columns]
+
+    comp_cols = [c for c in ["metal_cost", "diamond_cost", "total_labor_cost"] if c in filtered.columns]
+
     if comp_cols:
         if "style_category" in filtered.columns:
-            comp_summary = (filtered_viz.groupby("style_category")[comp_cols]
-                            .median().reset_index().rename(columns={c: f"median_{c}" for c in comp_cols}))
-            st.dataframe(comp_summary, use_container_width=True)
+            # --- Compute median by style_category ---
+            comp_summary = (
+                filtered_viz.groupby("style_category")[comp_cols]
+                .median()
+                .reset_index()
+                .rename(columns={c: f"median_{c}" for c in comp_cols})
+            )
+
+            # --- Numeric formatting map ---
+            numeric_fmt = {
+                f"median_{c}": "${:,.2f}" for c in comp_cols
+            }
+
+            # --- Apply numeric formatting ---
+            comp_fmt = comp_summary.copy()
+            for col, fmt in numeric_fmt.items():
+                if col in comp_fmt.columns:
+                    comp_fmt[col] = comp_fmt[col].apply(lambda x: fmt.format(x) if pd.notnull(x) else "")
+
+            # --- Display formatted dataframe ---
+            st.dataframe(comp_fmt, use_container_width=True)
+
+        # --- Scatter plots (selling price relationships) ---
         if "selling_price" in filtered.columns:
             c1, c2 = st.columns(2)
             for i, col in enumerate(comp_cols[:2]):
-                fig = px.scatter(filtered_viz, x=col, y="selling_price",
-                                 color="style_category" if "style_category" in filtered.columns else None,
-                                 hover_data=["style_cd", "vendor_id"] if "style_cd" in filtered.columns else None,
-                                 title=f"Selling Price vs {col}")
+                fig = px.scatter(
+                    filtered_viz,
+                    x=col,
+                    y="selling_price",
+                    color="style_category" if "style_category" in filtered.columns else None,
+                    hover_data=["style_cd", "vendor_id"] if "style_cd" in filtered.columns else None,
+                    title=f"Selling Price vs {col}"
+                )
                 (c1 if i == 0 else c2).plotly_chart(fig, use_container_width=True)
+
+        # --- Distributions ---
         st.markdown("#### Component Distributions")
         for col in comp_cols:
             fig = px.histogram(filtered_viz, x=col, nbins=40, title=f"Distribution of {col}")
             fig.update_layout(bargap=0.2)
             st.plotly_chart(fig, use_container_width=True)
+
     else:
         st.info("No component columns (metal_cost, diamond_cost, melt_value, total_labor_cost).")
+
 
 # ---- Department Breakdown ----
 with tab_dept:
@@ -572,17 +611,53 @@ with tab_costcomp:
 # ---- Vendors ----
 with tab_vendor:
     st.subheader("Vendor Summary")
+
     if "vendor_id" in filtered.columns:
+        # --- Define columns to aggregate ---
         extra = [c for c in ["selling_price", "metal_cost", "diamond_cost", "total_labor_cost"] if c in filtered.columns]
+
+        # --- Numeric formatting map ---
+        numeric_fmt = {
+            "selling_price": "${:,.2f}",
+            "metal_cost": "${:,.2f}",
+            "diamond_cost": "${:,.2f}",
+            "total_labor_cost": "${:,.2f}",
+        }
+
+        # --- Build aggregation dictionary ---
         agg_dict = {"style_cd": "count"}
         for c in extra:
             agg_dict[c] = "median"
-        vendor_summary = (filtered.groupby("vendor_id").agg(agg_dict)
-                          .rename(columns={"style_cd": "styles"}).reset_index()
-                          .sort_values("styles", ascending=False))
-        st.dataframe(vendor_summary, use_container_width=True)
+
+        # --- Compute summary ---
+        vendor_summary = (
+            filtered.groupby("vendor_id").agg(agg_dict)
+            .rename(columns={"style_cd": "styles"})
+            .reset_index()
+            .sort_values("styles", ascending=False)
+        )
+
+        # --- Apply numeric formatting ---
+        vendor_fmt = vendor_summary.copy()
+        for col, fmt in numeric_fmt.items():
+            if col in vendor_fmt.columns:
+                vendor_fmt[col] = vendor_fmt[col].apply(lambda x: fmt.format(x) if pd.notnull(x) else "")
+
+        # --- Format styles count with commas ---
+        if "styles" in vendor_fmt.columns:
+            vendor_fmt["styles"] = vendor_fmt["styles"].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else "")
+
+        # --- Display dataframe ---
+        st.dataframe(vendor_fmt, use_container_width=True)
+
+        # --- Plot top vendors ---
         if "styles" in vendor_summary.columns:
-            fig = px.bar(vendor_summary.head(25), x="vendor_id", y="styles", title="Top Vendors by Style Count")
+            fig = px.bar(
+                vendor_summary.head(25),
+                x="vendor_id",
+                y="styles",
+                title="Top Vendors by Style Count"
+            )
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No vendor_id column.")
@@ -627,13 +702,42 @@ with tab_pricing:
 # ---- Style Drilldown ----
 with tab_drill:
     st.subheader("Style Drilldown")
+
     q = st.text_input("Search style_cd")
     if q:
         qdf = filtered[filtered["style_cd"].str.contains(q.strip().upper(), na=False)]
     else:
         qdf = filtered.head(200)
 
-    cols = [c for c in ["style_cd", "style_desc", "style_category", "metal_typ", "vendor_id",
-                        "selling_price", "metal_cost", "diamond_cost", "total_labor_cost",
-                        "melt_value"] if c in filtered.columns]
-    st.dataframe(qdf[cols], use_container_width=True)    
+    cols = [
+        c for c in [
+            "style_cd",
+            "style_desc",
+            "style_category",
+            "metal_typ",
+            "vendor_id",
+            "selling_price",
+            "metal_cost",
+            "diamond_cost",
+            "total_labor_cost",
+            "melt_value"
+        ] if c in filtered.columns
+    ]
+
+    # --- Numeric formatting map ---
+    numeric_fmt = {
+        "selling_price": "${:,.2f}",
+        "metal_cost": "${:,.2f}",
+        "diamond_cost": "${:,.2f}",
+        "total_labor_cost": "${:,.2f}",
+        "melt_value": "${:,.2f}",
+    }
+
+    # --- Format numeric columns safely ---
+    qdf_fmt = qdf[cols].copy()
+    for col, fmt in numeric_fmt.items():
+        if col in qdf_fmt.columns:
+            qdf_fmt[col] = qdf_fmt[col].apply(lambda x: fmt.format(x) if pd.notnull(x) else "")
+
+    # --- Display formatted dataframe ---
+    st.dataframe(qdf_fmt, use_container_width=True)
