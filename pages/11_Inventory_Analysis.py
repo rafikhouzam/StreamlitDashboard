@@ -172,26 +172,51 @@ else:
 
 available_cols = [c for c in dept_cols if c in filtered.columns]
 
-# Coerce *all* available dept columns to numeric for correct summing
-dep_all_num = filtered[available_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
-
-# Compute total quantity and total value for the filtered subset
+# ============================
+# Quantity & Value Calculations (Refined)
+# ============================
 filtered = filtered.copy()
-dep_num = filtered[sel_deps].apply(pd.to_numeric, errors="coerce").fillna(0)
-filtered["total_quantity"] = dep_num.sum(axis=1)
-filtered["total_value"] = filtered["total_quantity"] * filtered["total_cost"]
 
-# ----------------------
-# KPIs (No margin)
-# ----------------------
+# --- Define relevant department and cost columns ---
+dept_cols_valid = [c for c in dept_cols if c in filtered.columns]
+cost_cols_core = [
+    "metal_cost",
+    "diamond_cost",
+    "total_labor_cost",
+    "costfor_duty1",
+    "other_cost",
+    "cstone_cost",
+    "costfor_duty2"
+]
 
+# --- Coerce numeric ---
+filtered[dept_cols_valid] = filtered[dept_cols_valid].apply(pd.to_numeric, errors="coerce").fillna(0)
+filtered[cost_cols_core] = filtered[cost_cols_core].apply(pd.to_numeric, errors="coerce").fillna(0)
+
+# --- Compute total quantity (sum across dept columns) ---
+filtered["total_quantity"] = filtered[dept_cols_valid].sum(axis=1)
+
+# --- Compute component sum, total value, and diaspark value ---
+filtered["component_sum"] = (
+    filtered["metal_cost"]
+    + filtered["diamond_cost"]
+    + filtered["total_labor_cost"]
+    + filtered["costfor_duty1"]
+    + filtered["other_cost"]
+    + filtered["cstone_cost"]
+)
+
+filtered["total_value"] = filtered["component_sum"] * filtered["total_quantity"]
+filtered["diaspark_value"] = filtered["costfor_duty2"] * filtered["total_quantity"]
+
+# --- KPI Cards ---
 k1, k2, k3, k4, k5 = st.columns(5)
+
 k1.metric("Total Styles", f"{len(filtered):,}")
-k2.metric("Total Pieces", f"{filtered['total_quantity'].sum():,.0f}")
-k3.metric("Avg Cost / Piece", f"${filtered['total_cost'].mean():,.2f}")
-k4.metric("Median Cost / Piece", f"${filtered['total_cost'].median():,.2f}")
-total_value = filtered["total_value"].sum()
-k5.metric("Total Value", f"${total_value:,.0f}")
+k2.metric("Total Quantity", f"{filtered['total_quantity'].sum():,.0f}")
+k3.metric("Avg Cost / Piece", f"${filtered['component_sum'].mean():,.2f}")
+k4.metric("Median Cost / Piece", f"${filtered['component_sum'].median():,.2f}")
+k5.metric("Total Value", f"${filtered['total_value'].sum():,.0f}")
 
 # ----------------------
 # Tabs
