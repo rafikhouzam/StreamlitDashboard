@@ -1,59 +1,49 @@
 import streamlit as st
+from streamlit_auth import require_login, logout
 
-st.set_page_config(
-    page_title="Home",
-    page_icon="🏠",
-    layout="wide"
-)
+st.set_page_config(page_title="Aneri Dashboard", layout="wide")
 
+require_login()
+user = st.session_state["user"]
+role = st.session_state["role"]
 
-# Configure the page
-#st.set_page_config(page_title="Aneri Jewels Analytics", layout="wide")
+st.sidebar.write(f"User — {user}")
 
-# --- Top Section: Logo / Title ---
-# Optional: Add a logo if you have one
-# st.image("your_logo.png", width=300)
-st.sidebar.markdown(
-    "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
-    unsafe_allow_html=True
-)
+# ----- Catalog: path, title, allowed_roles (empty => everyone), icon (optional)
+page_roles = {
+    "00_Signet_Sales.py": ["sales"],
+    "05_Ecommerce_Dashboard.py": ["sales"],
+    "10_Slow_Memo_Analysis.py": ["sales"],
+    "11_Inventory_Analysis.py": ["admin"],
+    "15_Stock_Aging.py": ["admin"],
+    "20_Image_Lookup.py": [],
+    "21_Image_Upload_Search.py": [],
+}
 
+# ----- Catalog: path, title, allowed_roles (empty => everyone), icon (optional)
+catalog = [
+    ("pages/00_Signet_Sales.py",         "Signet Sales",            ["sales"],   "🧾"),
+    ("pages/05_Ecommerce_Dashboard.py",  "Ecommerce Dashboard",     ["sales"],   "📊"),
+    ("pages/10_Slow_Memo_Analysis.py",   "Slow Memo Analysis",      ["sales"],   "🐢"),
+    ("pages/11_Inventory_Analysis.py",   "Inventory Analysis",      ["admin"],   "🛠️"),
+    ("pages/15_Stock_Aging.py",          "Stock Aging",             ["admin"],   "📦"),
+    ("pages/20_Image_Lookup.py",         "Image Lookup",            [],          "🔎"),
+    ("pages/21_Image_Upload_Search.py",  "Image Upload Search",     [],          "⬆️"),
+]
 
-st.markdown(
-    "<h1 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels Analytics Portal 💎</h1>",
-    unsafe_allow_html=True
-)
+# ----- Filter by role (admins see everything automatically)
+allowed = [
+    st.Page(path, title=title, icon=icon)
+    for path, title, roles, icon in catalog
+    if (not roles) or (role in roles) or (role == "admin")
+]
 
-st.markdown("---")
+# Optional: group into sections
+nav = st.navigation(allowed)   # or: st.navigation({"Analytics": allowed_basic, "Admin": allowed_admin})
 
-# --- Welcome Message ---
-st.subheader("Welcome to the internal analytics portal!")
-st.write("""
-This platform provides insights into our ecommerce performance and memo inventory management.
+nav.run()
 
-Use the sidebar to navigate between:
--  **Signet Sales**
--  **Ecommerce Dashboard**
--  **Slow Memo Analysis**
--  **Stock Aging**
--  **Image Lookup**
--  **Reverse Image Search**
-
-More dashboards and features are coming soon as I expand the system.
-""")
-
-# --- Highlights / Updates Section ---
-# --- Highlights / Updates Section ---
-st.info(" Reverse Image Search live! Upload any image to find visually similar styles using OpenAI CLIP Machine Learning Model.")
-st.info(" New: Stock Aging Analysis. Signet North America sales data now integrated.")
-st.info(" Coming soon: AI capabilities for generating images of jewelry.")
-st.info("For any questions or development suggestions, feel free to email me at rafi@anerijewels.com")
-
-# --- Footer Divider ---
-st.markdown("---")
-
-# --- Optional: Centered Footer Text ---
-st.markdown(
-    "<p style='text-align: center; color: gray;'>© 2025 Aneri Jewels. All Rights Reserved.</p>",
-    unsafe_allow_html=True
-)
+# Sidebar
+if st.sidebar.button("Logout"):
+    logout()
+    st.rerun()  # <- valid here because this is *outside* the callback

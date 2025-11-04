@@ -5,6 +5,10 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from streamlit_auth import require_login
+
+require_login()
+
 
 # -----------------------------
 # Page setup

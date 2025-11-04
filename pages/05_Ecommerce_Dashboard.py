@@ -5,6 +5,9 @@ import pandas as pd
 import requests
 import plotly.express as px
 from utils.navbar import navbar
+from streamlit_auth import require_login
+
+require_login()
 
 st.set_page_config(
     page_title="Ecommerce Dashboard",

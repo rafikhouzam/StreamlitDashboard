@@ -6,6 +6,9 @@ import requests
 import altair as alt
 import plotly.express as px
 from utils.navbar import navbar
+from streamlit_auth import require_login
+
+require_login()
 
 st.set_page_config(page_title="Signet Sales", layout="wide")
 navbar()
@@ -39,7 +42,10 @@ def _ensure_metrics(df: pd.DataFrame) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def load_signet(month: str | None = None) -> pd.DataFrame:
     """Load from API (JSON) with optional month filter."""
-    headers = {"X-API-KEY": API_KEY} if API_KEY else {}
+    headers = {
+        "Authorization": f"Bearer {st.session_state['token']}",
+        "X-API-KEY": st.secrets["API_KEY"]
+    }    
     params = {"month": month} if month else {}
     r = requests.get(API_URL, headers=headers, params=params, timeout=30)
     r.raise_for_status()

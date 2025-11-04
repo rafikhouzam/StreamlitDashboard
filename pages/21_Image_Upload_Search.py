@@ -1,6 +1,10 @@
 import streamlit as st
 import requests
 from PIL import Image
+from streamlit_auth import require_login
+
+require_login()
+
 
 st.set_page_config(
     page_title="Image Upload Search",

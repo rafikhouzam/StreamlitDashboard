@@ -4,6 +4,10 @@ import plotly.express as px
 import numpy as np
 import requests
 from utils.navbar import navbar
+from streamlit_auth import require_login
+
+require_login()
+
 
 # Page config
 st.set_page_config(

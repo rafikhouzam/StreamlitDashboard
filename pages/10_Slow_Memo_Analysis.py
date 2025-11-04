@@ -5,6 +5,10 @@ import plotly.express as px
 import requests
 from io import BytesIO
 from utils.navbar import navbar
+from streamlit_auth import require_login
+
+require_login()
+
 
 # Page config
 st.set_page_config(

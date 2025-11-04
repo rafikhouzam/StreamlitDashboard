@@ -3,6 +3,10 @@ import pandas as pd
 import requests
 import inspect
 import numpy as np
+from streamlit_auth import require_login
+
+require_login()
+
 
 st.set_page_config(
     page_title="Image Lookup",
