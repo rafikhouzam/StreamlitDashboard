@@ -76,8 +76,8 @@ LOCK_COLS = ["gold_lock", "silver_lock", "platinum_lock", "palladium_lock"]
 
 # Department columns relevant for quantity/value computation
 dept_cols = [
-    "SO", "SOSTK", "PR", "PO", "POSM", "WB", "SEMI", "CNTR",
-    "CAST", "QC", "LAB", "INTR", "REP", "VNDR", "SCRP", "CRET",
+    "CNTR", "CAST", "QC", "LAB", "INTR", 
+    "REP", "VNDR", "SCRP", "CRET",
     "SCL", "RTS", "OM"
 ]
 
