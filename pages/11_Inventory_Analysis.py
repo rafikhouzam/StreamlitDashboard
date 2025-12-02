@@ -177,7 +177,7 @@ else:
 available_cols = [c for c in dept_cols if c in filtered.columns]
 
 # ============================
-# Quantity & Value Calculations (Refined)
+# Quantity & Value Calculations (Respecting Dept Filter)
 # ============================
 filtered = filtered.copy()
 
@@ -190,17 +190,26 @@ cost_cols_core = [
     "costfor_duty1",
     "other_cost",
     "cstone_cost",
-    "costfor_duty2"
+    "costfor_duty2",
 ]
 
 # --- Coerce numeric ---
 filtered[dept_cols_valid] = filtered[dept_cols_valid].apply(pd.to_numeric, errors="coerce").fillna(0)
-filtered[cost_cols_core] = filtered[cost_cols_core].apply(pd.to_numeric, errors="coerce").fillna(0)
+for c in cost_cols_core:
+    if c in filtered.columns:
+        filtered[c] = pd.to_numeric(filtered[c], errors="coerce").fillna(0)
 
-# --- Compute total quantity (sum across dept columns) ---
-filtered["total_quantity"] = filtered[dept_cols_valid].sum(axis=1)
+# --- Decide which dept columns to use for quantity based on current selection ---
+# sel_deps already comes from the sidebar and has "All" resolved to the concrete list
+active_deps_for_qty = [d for d in sel_deps if d in dept_cols_valid]
+if not active_deps_for_qty:
+    # Fallback: if nothing is selected for some reason, use all dept columns present
+    active_deps_for_qty = dept_cols_valid
 
-# --- Compute component sum, total value, and diaspark value ---
+# --- Compute total quantity using only the active department columns ---
+filtered["total_quantity"] = filtered[active_deps_for_qty].sum(axis=1)
+
+# --- Compute component sum and values ---
 filtered["component_sum"] = (
     filtered["metal_cost"]
     + filtered["diamond_cost"]
@@ -212,6 +221,7 @@ filtered["component_sum"] = (
 
 filtered["total_value"] = filtered["component_sum"] * filtered["total_quantity"]
 filtered["diaspark_value"] = filtered["costfor_duty2"] * filtered["total_quantity"]
+
 
 # --- KPI Cards ---
 k1, k2, k3, k4, k5 = st.columns(5)
