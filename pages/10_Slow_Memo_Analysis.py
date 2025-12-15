@@ -40,6 +40,27 @@ except Exception as e:
     st.error("❌ Failed to load updated data.")
     st.text(f"Error: {e}")
 
+money_cols = ["Open_Memo_Amt", "Open_Memo_Value", "Total_Memo_Value", "Total_Memo_Amt"]
+qty_cols   = ["Open_Memo_Qty", "Total_Memo_Qty", "Shipped_Qty", "Returned_Qty"]
+
+def to_number(s):
+    return (
+        pd.to_numeric(
+            s.astype(str)
+             .str.replace(r"[\$,]", "", regex=True)
+             .str.strip(),
+            errors="coerce"
+        )
+    )
+
+for c in money_cols:
+    if c in df.columns:
+        df[c] = to_number(df[c])
+
+for c in qty_cols:
+    if c in df.columns:
+        df[c] = to_number(df[c])
+
 # === Sidebar Filters ===
 st.sidebar.header("Filters")
 
@@ -356,6 +377,59 @@ else:
             file_name=f"SlowMemo_Unspecified_{datetime.today().strftime('%Y-%m-%d')}.csv",
             mime="text/csv"
         )
+
+st.subheader("RA Activity")
+
+# Ensure datetime
+if "Date_RA_Issued" in df.columns:
+    df["Date_RA_Issued"] = pd.to_datetime(df["Date_RA_Issued"], errors="coerce")
+
+# Filter valid RA dates
+ra_df = df.loc[df["Date_RA_Issued"].notna()].copy()
+
+# KPIs
+c1, c2, c3 = st.columns(3)
+
+total_ras = len(ra_df)
+ras_30d = len(ra_df.loc[ra_df["Date_RA_Issued"] >= (pd.Timestamp.today().normalize() - pd.Timedelta(days=30))])
+
+c1.metric("Total RAs (dated)", f"{total_ras:,}")
+c2.metric("RAs last 30 days", f"{ras_30d:,}")
+
+# Optional: sum of open memo amount tied to RA (only if column exists + numeric)
+if "Open_Memo_Amt" in ra_df.columns:
+    c3.metric("Open Memo Value (RA styles)", f"${ra_df['Open_Memo_Amt'].sum():,.0f}")
+else:
+    c3.metric("Open Memo Value (RA styles)", "—")
+
+# Chart controls
+granularity = st.radio("Granularity", ["Daily", "Monthly"], horizontal=True)
+
+if total_ras == 0:
+    st.info("No valid RA dates found in Date_RA_Issued yet.")
+else:
+    if granularity == "Daily":
+        series = (
+            ra_df.groupby(ra_df["Date_RA_Issued"].dt.date)
+                 .size()
+                 .reset_index(name="RA_Count")
+                 .rename(columns={"Date_RA_Issued": "Date"})
+        )
+        fig = px.bar(series, x="Date", y="RA_Count")
+        fig.update_layout(yaxis_title="RAs", xaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
+    else:  # Monthly
+        series = (
+            ra_df.assign(Month=ra_df["Date_RA_Issued"].dt.to_period("M").dt.to_timestamp())
+                 .groupby("Month")
+                 .size()
+                 .reset_index(name="RA_Count")
+        )
+        fig = px.bar(series, x="Month", y="RA_Count")
+        fig.update_layout(yaxis_title="RAs", xaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
 
 # === Simple export for edits (no extra cols, no dropdowns) ===
 st.subheader("📥 Export current view")
