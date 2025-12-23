@@ -405,30 +405,65 @@ else:
 # Chart controls
 granularity = st.radio("Granularity", ["Daily", "Monthly"], horizontal=True)
 
+
 if total_ras == 0:
     st.info("No valid RA dates found in Date_RA_Issued yet.")
 else:
     if granularity == "Daily":
         series = (
-            ra_df.groupby(ra_df["Date_RA_Issued"].dt.date)
-                 .size()
-                 .reset_index(name="RA_Count")
-                 .rename(columns={"Date_RA_Issued": "Date"})
+            ra_df
+            .groupby(ra_df["Date_RA_Issued"].dt.date)
+            .agg(
+                RA_Count=("Date_RA_Issued", "size"),
+                RA_Value=("Open_Memo_Amt", "sum"),
+            )
+            .reset_index()
+            .rename(columns={"Date_RA_Issued": "Date"})
         )
-        fig = px.bar(series, x="Date", y="RA_Count")
+
+        fig = px.bar(
+            series,
+            x="Date",
+            y="RA_Count",
+            hover_data={
+                "RA_Count": True,
+                "RA_Value": ":$,.0f",   # money formatting
+                "Date": False
+            }
+        )
+
         fig.update_layout(yaxis_title="RAs", xaxis_title="")
-        st.plotly_chart(fig, use_container_width=True)
+
+        st.plotly_chart(fig)
+
+
 
     else:  # Monthly
         series = (
-            ra_df.assign(Month=ra_df["Date_RA_Issued"].dt.to_period("M").dt.to_timestamp())
-                 .groupby("Month")
-                 .size()
-                 .reset_index(name="RA_Count")
+            ra_df
+            .assign(Month=ra_df["Date_RA_Issued"].dt.to_period("M").dt.to_timestamp())
+            .groupby("Month")
+            .agg(
+                RA_Count=("Date_RA_Issued", "size"),
+                RA_Value=("Open_Memo_Amt", "sum")
+            )
+            .reset_index()
         )
-        fig = px.bar(series, x="Month", y="RA_Count")
+
+        fig = px.bar(
+            series,
+            x="Month",
+            y="RA_Count",
+            hover_data={
+                "RA_Count": True,
+                "RA_Value": ":$,.0f",
+                "Month": False
+            }
+        )
+
         fig.update_layout(yaxis_title="RAs", xaxis_title="")
-        st.plotly_chart(fig, use_container_width=True)
+
+        st.plotly_chart(fig)
 
 
 # === Simple export for edits (no extra cols, no dropdowns) ===
