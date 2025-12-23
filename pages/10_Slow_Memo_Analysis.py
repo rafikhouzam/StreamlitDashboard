@@ -428,7 +428,7 @@ else:
             hover_data={
                 "RA_Count": True,
                 "RA_Value": ":$,.0f",   # money formatting
-                "Date": False
+                "Date": True
             }
         )
 
@@ -457,7 +457,7 @@ else:
             hover_data={
                 "RA_Count": True,
                 "RA_Value": ":$,.0f",
-                "Month": False
+                "Month": True
             }
         )
 
