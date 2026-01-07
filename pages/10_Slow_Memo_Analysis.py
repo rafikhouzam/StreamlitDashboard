@@ -1,14 +1,12 @@
 import streamlit as st
 import pandas as pd
+import requests
 from datetime import datetime
 import plotly.express as px
-import requests
-from io import BytesIO
 from utils.navbar import navbar
 from streamlit_auth import require_login
 
 require_login()
-
 
 # Page config
 st.set_page_config(
@@ -19,6 +17,9 @@ st.set_page_config(
 navbar()
 st.title("🪙 Slow Moving Memo Analysis")
 
+# ----------------------------
+# Load from SQL (enriched view)
+# ----------------------------
 # Load dataset
 @st.cache_data
 def load_memo():
@@ -28,73 +29,173 @@ def load_memo():
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
-def load_local():
-    # Fallback to local CSV for testing
-    csv_path = st.secrets["LOCAL_MEMO_PATH"]
-    return pd.read_csv(csv_path)
+@st.cache_data(ttl=60)
+def fetch_memo_health():
+    url = f"https://api.anerijewels.com/memo/health"
+    headers = {"X-API-KEY": st.secrets["API_KEY"]}
+    r = requests.get(url, headers=headers, timeout=30)
+    r.raise_for_status()
+    return r.json()
 
+@st.cache_data(ttl=300)
+def fetch_memo(cust_code=None, department=None, ae=None, performance_category=None, limit=5000):
+    """
+    Reads memo data from the new FastAPI route:
+      GET {API_BASE}/memo?limit=...
+    Expected response:
+      {"count": N, "rows": [ ... ]}
+    """
+    params = {"limit": limit}
+    if cust_code: params["cust_code"] = cust_code
+    if department: params["department"] = department
+    if ae: params["ae"] = ae
+    if performance_category: params["performance_category"] = performance_category
+
+    url = f"https://api.anerijewels.com/api/memo"
+    headers = {"X-API-KEY": st.secrets["API_KEY"]}
+
+    r = requests.get(url, headers=headers, params=params, timeout=60)
+    r.raise_for_status()
+    payload = r.json()
+
+    rows = payload.get("rows", []) if isinstance(payload, dict) else payload
+    meta = {
+        "total": payload.get("count", len(rows)) if isinstance(payload, dict) else len(rows),
+    }
+    df = pd.DataFrame(rows)
+    return meta, df
+
+meta, df = fetch_memo(limit=5000)
+
+# Optional: show freshness (kept lightweight)
 try:
-    use_local = st.secrets.get("USE_LOCAL_MEMO_DATA", False)
-    df = load_local() if use_local else load_memo()
-except Exception as e:
-    st.error("❌ Failed to load updated data.")
-    st.text(f"Error: {e}")
+    health = fetch_memo_health()
+    st.caption(f"API rows: {health.get('rows')} | cache_age_seconds: {health.get('cache_age_seconds')} | etag: {health.get('etag')}")
+except Exception:
+    pass
 
-money_cols = ["Open_Memo_Amt", "Open_Memo_Value", "Total_Memo_Value", "Total_Memo_Amt"]
-qty_cols   = ["Open_Memo_Qty", "Total_Memo_Qty", "Shipped_Qty", "Returned_Qty"]
-
-def to_number(s):
-    return (
-        pd.to_numeric(
-            s.astype(str)
-             .str.replace(r"[\$,]", "", regex=True)
-             .str.strip(),
-            errors="coerce"
-        )
-    )
-
-for c in money_cols:
+#st.write(f"Snapshot: {payload['snapshot_date']} | Rows returned: {len(df)} | Total: {payload['total']}")
+#st.write(df.columns.tolist())
+st.dataframe(df, use_container_width=True)
+# ----------------------------
+# Apply runtime merge (Style-level)
+# ----------------------------
+for c in ["RA_Issued"]:
     if c in df.columns:
-        df[c] = to_number(df[c])
+        df[c] = df[c].fillna("")
 
-for c in qty_cols:
-    if c in df.columns:
-        df[c] = to_number(df[c])
 
-# === Sidebar Filters ===
-st.sidebar.header("Filters")
+RENAME_MAP = {
+    "Div": "Div",
+    "AE": "AE",
+    "Buyer": "Buyer",
+    "Department": "Department",
+    "Cust Code": "Cust Code",
+    "Customer": "Customer",
+    "Style": "Style",
+    "Style Description": "Style Description",
+    "SKU No.": "SKU No.",
+    "Metal Kt": "Metal Kt",
+    "Inception Dt.": "Inception Dt.",
+    "OM 1/1/24": "OM 1/1/24",
 
-# Filter: Account Executive
-ae_selected = st.sidebar.multiselect("Account Executive(s)", df["AE"].unique())
-if ae_selected:
-    df = df[df["AE"].isin(ae_selected)]
+    # shipping / returns consolidation
+    "Shipped_Qty": "Shipped Qty 2024-25",
+    "Returned_Qty": "Returned Qty 2024-25",
 
-# Filter: Customer
-customer_selected = st.sidebar.multiselect("Customer(s)", df["Customer"].unique())
-if customer_selected:
-    df = df[df["Customer"].isin(customer_selected)]
+    # sales
+    "Net_Sales_2024": "Net Sales 2024",
+    "Net_Sales_2025_YTD": "Net Sales 2025 YTD",
+    "Net_Sales_2026": "Net Sales 2026",
 
-# ✅ NEW: Filter by Metal
-metal_selected = st.sidebar.multiselect("Metal Type(s)", df["Metal Kt"].unique())
-if metal_selected:
-    df = df[df["Metal Kt"].isin(metal_selected)]
+    # memo + performance
+    "Open_Memo_Qty": "Open Memo Qty",
+    "Open_Memo_Amt": "Open Memo Amt",
+    "Sell_Through_Pct": "Sell Through %",
+    "Expected_Sales_6mo": "Expected Sales in next 6 months",
+    "Excess": "Excess",
 
-# Filter: Performance Category
-performance_selected = st.sidebar.multiselect("Performance Category", df["Performance_Category"].unique())
-if performance_selected:
-    df = df[df["Performance_Category"].isin(performance_selected)]
+    # RA / misc
+    "RA_Issued": "RA_Issued",
+    "Date_RA_Issued": "Date_RA_Issued",
+    "Disposition": "Disposition",
+    "Comments": "Comments",
+    "Performance_Category": "Performance_Category",
+    "image_url": "image_url",
+}
 
-# --- Disposition filter (normalized) ---
-def _normalize_disposition(s: pd.Series) -> pd.Series:
+preferred_order = [
+    "Div",
+    "AE",
+    "Buyer",
+    "Department",
+    "Cust Code",
+    "Customer",
+    "Style",
+    "Style Description",
+    "SKU No.",
+    "Metal Kt",
+    "Inception Dt.",
+    "OM 1/1/24",
+    "Shipped Qty 2024-25",
+    "Returned Qty 2024-25",
+    "Net Sales 2024",
+    "Net Sales 2025 YTD",
+    "Net Sales 2026",
+    "Open Memo Qty",
+    "Open Memo Amt",
+    "Sell Through %",
+    "Expected Sales in next 6 months",
+    "Excess",
+    "RA_Issued",
+    "Date_RA_Issued",
+    "Disposition",
+    "Comments",
+    "Performance_Category",
+    "image_url",
+]
+
+#rename
+#df = df.rename(columns={k: v for k, v in RENAME_MAP.items() if k in df.columns})
+# reorder
+df = df[[c for c in preferred_order if c in df.columns]]
+
+# ----------------------------
+# Type coercions (new column names)
+# ----------------------------
+money_cols = [
+    "Open Memo Amt",
+]
+qty_cols = [
+    "OM 1/1/24",
+    "Shipped Qty 2024-25",
+    "Returned Qty 2024-25",
+    "Net Sales 2024",
+    "Net Sales 2025 YTD",
+    "Net Sales 2026",
+    "Open Memo Qty",
+    "Expected Sales in next 6 months",
+    "Excess",
+    "Sell Through %",  # keep numeric (0-1)
+]
+
+def normalize_disposition(s: pd.Series) -> pd.Series:
+    """
+    Canonicalize disposition values for consistent filtering + analytics.
+    Output values are in this set:
+      Unspecified, Perpetual Memo, Hold On Memo/Monitor, RTV - Closeout, RTV - Melt, <Other Title Cased>
+    """
     s = (
         s.fillna("").astype(str).str.strip()
          .str.replace(r"\s+", " ", regex=True).str.lower()
     )
+
     canon = {
         "": "Unspecified",
         "unspecified": "Unspecified",
         "perpetual memo": "Perpetual Memo",
         "hold on memo/monitor": "Hold On Memo/Monitor",
+        "hold on memo / monitor": "Hold On Memo/Monitor",
         "rtv closeout": "RTV - Closeout",
         "rtv - closeout": "RTV - Closeout",
         "rtv- closeout": "RTV - Closeout",
@@ -102,41 +203,99 @@ def _normalize_disposition(s: pd.Series) -> pd.Series:
         "rtv - melt": "RTV - Melt",
         "rtv- melt": "RTV - Melt",
     }
+
     s = s.replace(canon)
-    s = s.apply(lambda x: x if x in {"Unspecified","Perpetual Memo","Hold On Memo/Monitor","RTV - Closeout","RTV - Melt"} else (x.title() if x else "Unspecified"))
+
+    allowed = {"Unspecified", "Perpetual Memo", "Hold On Memo/Monitor", "RTV - Closeout", "RTV - Melt"}
+    s = s.apply(lambda x: x if x in allowed else (x.title() if x else "Unspecified"))
+
     return s
 
+
+def to_number(s: pd.Series) -> pd.Series:
+    return pd.to_numeric(
+        s.astype(str)
+         .str.replace(r"[\$,]", "", regex=True)
+         .str.strip(),
+        errors="coerce"
+    )
+
+for c in money_cols + qty_cols:
+    if c in df.columns:
+        df[c] = to_number(df[c])
+
+# Datetime coercion
+if "Inception Dt." in df.columns:
+    df["Inception Dt."] = pd.to_datetime(df["Inception Dt."], errors="coerce")
+
+if "Date_RA_Issued" in df.columns:
+    df["Date_RA_Issued"] = pd.to_datetime(df["Date_RA_Issued"], errors="coerce")
+
+# ----------------------------
+# Sidebar Filters
+# ----------------------------
+st.sidebar.header("Filters")
+
+if "AE" in df.columns:
+    ae_selected = st.sidebar.multiselect("Account Executive(s)", sorted(df["AE"].dropna().unique().tolist()))
+    if ae_selected:
+        df = df[df["AE"].isin(ae_selected)]
+
+if "Customer" in df.columns:
+    customer_selected = st.sidebar.multiselect("Customer(s)", sorted(df["Customer"].dropna().unique().tolist()))
+    if customer_selected:
+        df = df[df["Customer"].isin(customer_selected)]
+
+if "Metal Kt" in df.columns:
+    metal_selected = st.sidebar.multiselect("Metal Type(s)", sorted(df["Metal Kt"].dropna().unique().tolist()))
+    if metal_selected:
+        df = df[df["Metal Kt"].isin(metal_selected)]
+
+# --- Disposition filter (normalized) ---
 if "Disposition" in df.columns:
-    df["_Disp"] = _normalize_disposition(df["Disposition"])
+    df["_Disp"] = normalize_disposition(df["Disposition"])
     disp_options = ["All"] + sorted(df["_Disp"].dropna().unique().tolist())
     disp_selected = st.sidebar.multiselect("Disposition", disp_options, default=["All"])
     if disp_selected and "All" not in disp_selected:
         df = df[df["_Disp"].isin(disp_selected)]
+
+
+if "Performance_Category" in df.columns:
+    performance_selected = st.sidebar.multiselect(
+        "Performance Category",
+        sorted(df["Performance_Category"].dropna().unique().tolist())
+    )
+    if performance_selected:
+        df = df[df["Performance_Category"].isin(performance_selected)]
 
 st.sidebar.markdown(
     "<h2 style='text-align: center; color: #4B0082;'>💎 Aneri Jewels 💎</h2>",
     unsafe_allow_html=True
 )
 
-# === KPI Display ===
+# ----------------------------
+# KPIs
+# ----------------------------
 st.subheader("🔢 Key Metrics")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Styles", f"{len(df):,}")
-col2.metric("Open Memo Quantity", f"{(df['Open_Memo_Qty']).sum():,}")
-col3.metric("Open Memo Value", f"${(df['Open_Memo_Amt']).sum():,.0f}")
+k1, k2, k3 = st.columns(3)
+k1.metric("Total Styles", f"{len(df):,}")
+k2.metric("Open Memo Quantity", f"{df['Open Memo Qty'].sum():,.0f}" if "Open Memo Qty" in df.columns else "—")
+k3.metric("Open Memo Value", f"${df['Open Memo Amt'].sum():,.0f}" if "Open Memo Amt" in df.columns else "—")
 
-
-# === Display Sorted Table ===
+# ----------------------------
+# Table: sorting
+# ----------------------------
 st.subheader("Detailed Memo Table (Sorted)")
 
 sort_columns = {
-    "Open Memo Qty": "Open_Memo_Qty",
-    "Open Memo Amt ($)": "Open_Memo_Amt",
-    "Net Sales 2025 YTD ($)": "Net_Sales_2025_YTD"
+    "Open Memo Qty": "Open Memo Qty",
+    "Open Memo Amt ($)": "Open Memo Amt",
+    "Net Sales 2025 YTD (Qty)": "Net Sales 2025 YTD",
+    "Excess (Qty)": "Excess",
+    "Sell Through %": "Sell Through %"
 }
 
-# Real pill-style selection
 sort_display = st.radio(
     "Sort by Column:",
     options=list(sort_columns.keys()),
@@ -144,10 +303,8 @@ sort_display = st.radio(
     horizontal=True,
 )
 
-# Map the display label back to the real column
 sort_column = sort_columns[sort_display]
 
-# Order selector (still native radio for now)
 sort_order = st.radio(
     "Order:",
     options=["Descending", "Ascending"],
@@ -156,64 +313,61 @@ sort_order = st.radio(
 )
 ascending = sort_order == "Ascending"
 
-# Sort and display
 df_sorted = df.sort_values(by=sort_column, ascending=ascending)
 
-# Display top rows (now includes Disposition/Comments if present)
+# Columns to show
 base_cols = [
-    "AE", "Customer", "Metal Kt", "Style", "image_url", "Style Description", "Inception Dt.",
-    "Performance_Category"
+    "Div", "AE", "Customer", "Buyer",
+    "Style", "SKU No.", "Metal Kt",
+    "Style Description", "Inception Dt.",
+    "Performance_Category",
+    "RA_Issued", "Date_RA_Issued",
 ]
-extra_cols = [c for c in ["Disposition", "Comments"] if c in df_sorted.columns]
-metric_cols = ["Open_Memo_Qty", "Open_Memo_Amt", "Net_Sales_2025_YTD", "Expected_Sales_6mo"]
+metric_cols = [
+    "OM 1/1/24",
+    "Shipped Qty 2024-25",
+    "Returned Qty 2024-25",
+    "Net Sales 2024",
+    "Net Sales 2025 YTD",
+    "Net Sales 2026",
+    "Open Memo Qty",
+    "Open Memo Amt",
+    "Sell Through %",
+    "Expected Sales in next 6 months",
+    "Excess",
+]
 
-cols_to_show = [c for c in (base_cols + extra_cols + metric_cols) if c in df_sorted.columns]
+cols_to_show = [c for c in (base_cols + metric_cols) if c in df_sorted.columns]
 
-
-# Display with images
+# Render
 st.data_editor(
     df_sorted[cols_to_show],
     hide_index=True,
     use_container_width=True,
     column_config={
-        "image_url": st.column_config.ImageColumn(
-            "Image",
-            help="Thumbnail",
-            width="medium"
-        ),
-        "Open_Memo_Qty": st.column_config.NumberColumn(
-            "Open Memo Qty",
-            format=None 
-        ),
-        "Open_Memo_Amt": st.column_config.NumberColumn(
-            "Open Memo Amt ($)",
-            format="dollar"  
-        ),
-        "Net_Sales_2025_YTD": st.column_config.NumberColumn(
-            "Net Sales 2025 YTD ($)",
-            format="dollar"
-        ),
-        "Expected_Sales_6mo": st.column_config.NumberColumn(
-            "Expected Sales (6mo)",
-            format=None
-        ),
+        "image_url": st.column_config.ImageColumn("Image", width="medium"),
+        "Open Memo Amt": st.column_config.NumberColumn("Open Memo Amt ($)", format="dollar"),
+        "Sell Through %": st.column_config.NumberColumn("Sell Through %", format="%.2f"),
+        "Inception Dt.": st.column_config.DatetimeColumn("Inception Dt."),
+        "Date_RA_Issued": st.column_config.DatetimeColumn("Date RA Issued"),
     },
 )
 
-
-# === Use your filtered DataFrame here
 df_filtered = df_sorted.copy()
 
-# === Pivot helper ===
-def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, top_n: int = 10):
-    # Drop any 'Total' col if present, sort by total
+# ----------------------------
+# Pivots
+# ----------------------------
+def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, top_n: int | None = 10):
     df2 = pivot_df.copy()
     if "Total" in df2.columns:
         df2 = df2.drop(columns="Total")
-    totals = df2.sum(axis=1)
-    df2 = df2.loc[totals.sort_values(ascending=False).index].head(top_n)
 
-    # Convert to long form for Plotly
+    totals = df2.sum(axis=1)
+    df2 = df2.loc[totals.sort_values(ascending=False).index]
+    if top_n is not None:
+        df2 = df2.head(top_n)
+
     df2 = df2.reset_index().rename(columns={df2.index.name or index_name: index_name})
     long_df = df2.melt(id_vars=index_name, var_name="Category", value_name="Count")
     long_df = long_df[long_df["Count"] > 0]
@@ -223,78 +377,43 @@ def stacked_bar_from_pivot(pivot_df: pd.DataFrame, index_name: str, title: str, 
         x="Count", y=index_name, color="Category",
         orientation="h", barmode="stack",
         title=title,
-        category_orders={"Category": ["Dead Weight", "Slow Mover", "Review"]},  # adjust if more
-        color_discrete_map={
-            "Dead Weight": "#ef4444",  # red
-            "Slow Mover": "#f59e0b",   # amber
-            "Review": "#6b7280",       # gray
-        }
+        category_orders={"Category": ["Dead Weight", "Slow Mover", "Review"]},
     )
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
-
-# === Build pivots from df_filtered ===
-if "AE" in df_filtered.columns:
+if {"AE", "Performance_Category", "Style"}.issubset(df_filtered.columns):
     ae_pivot = df_filtered.pivot_table(
         index="AE", columns="Performance_Category", values="Style", aggfunc="size", fill_value=0
     )
     ae_group_sorted = ae_pivot.assign(Total=ae_pivot.sum(axis=1)).sort_values("Total", ascending=False)
     stacked_bar_from_pivot(ae_group_sorted, "AE", "AEs by Performance Category", top_n=None)
 
-top_n = st.slider("Top N Customers", 5, 20, 10, step=1)
+top_n = st.slider("Top N Customers", 5, 30, 10, step=1)
 
-if "Customer" in df_filtered.columns:
+if {"Customer", "Performance_Category", "Style"}.issubset(df_filtered.columns):
     customer_pivot = df_filtered.pivot_table(
         index="Customer", columns="Performance_Category", values="Style", aggfunc="size", fill_value=0
     )
     customer_group_sorted = customer_pivot.assign(Total=customer_pivot.sum(axis=1)).sort_values("Total", ascending=False)
     stacked_bar_from_pivot(customer_group_sorted, "Customer", "Top Customers by Count", top_n=top_n)
-
-
-# === Dispositions Analytics ===
+# ----------------------------
+# Dispositions Analytics (ported from old page)
+# ----------------------------
 st.subheader("Dispositions Analytics")
 
-# Guard: if Disposition not present, show info and skip
 if "Disposition" not in df_filtered.columns:
     st.info("No 'Disposition' column found in the current dataset.")
 else:
-    # Normalize Disposition to canonical labels
-    disp_raw = (
-        df_filtered["Disposition"]
-        .fillna("")
-        .astype(str)
-        .str.strip()
-        .str.replace(r"\s+", " ", regex=True)
-        .str.lower()
-    )
-    canon_map = {
-        "": "Unspecified",
-        "unspecified": "Unspecified",
-        "perpetual memo": "Perpetual Memo",
-        "hold on memo/monitor": "Hold on Memo/Monitor",
-        "rtv closeout": "RTV - Closeout",
-        "rtv - closeout": "RTV - Closeout",
-        "rtv- closeout": "RTV - Closeout",
-        "rtv melt": "RTV - Melt",
-        "rtv- melt": "RTV - Melt",
-        "rtv - melt": "RTV - Melt",
-        # keep anything else title-cased except 'RTV'
-    }
-    disp_canon = disp_raw.replace(canon_map)
-    # Title-case *other* values without breaking RTV
-    disp_canon = disp_canon.apply(lambda s: "RTV - Closeout" if s == "rtv - closeout"
-                                  else "RTV - Melt" if s == "rtv - melt"
-                                  else s.title() if s not in ["RTV - Closeout", "RTV - Melt", "Unspecified"] else s)
     df_analytics = df_filtered.copy()
-    df_analytics["_Disposition"] = disp_canon
+    df_analytics["_Disposition"] = normalize_disposition(df_analytics["Disposition"])
 
-    # Coerce amount for safer sums
-    amt_col = "Open_Memo_Amt" if "Open_Memo_Amt" in df_analytics.columns else None
+    # Amount column in your new schema
+    amt_col = "Open Memo Amt" if "Open Memo Amt" in df_analytics.columns else None
     if amt_col:
         df_analytics["_Amt"] = pd.to_numeric(df_analytics[amt_col], errors="coerce")
     else:
         df_analytics["_Amt"] = 0.0
-    # KPIs
+
     total_lines = len(df_analytics)
     unspecified_ct = int((df_analytics["_Disposition"] == "Unspecified").sum())
     assigned_ct = total_lines - unspecified_ct
@@ -317,11 +436,9 @@ else:
     k4.metric("Hold/Monitor", f"{hold_ct:,}", f"${hold_amt:,.0f}", delta_color="off")
     k5.metric("Perpetual Memo", f"{perp_ct:,}", f"${perp_amt:,.0f}", delta_color="off")
 
-    # Metric toggle
-    metric = st.radio("Metric", ["Count", "Open_Memo_Amt ($)"], horizontal=True, index=0)
+    metric = st.radio("Metric", ["Count", "Open Memo Amt ($)"], horizontal=True, index=0)
     value_col = "Count" if metric == "Count" else "Amt"
 
-    # Grouped data
     g_disp = (
         df_analytics.groupby("_Disposition", dropna=False)
         .agg(Count=("Style", "size"), Amt=("_Amt", "sum"))
@@ -329,13 +446,6 @@ else:
         .sort_values(value_col, ascending=False)
     )
 
-    g_ae = (
-        df_analytics.groupby(["AE", "_Disposition"], dropna=False)
-        .agg(Count=("Style", "size"), Amt=("_Amt", "sum"))
-        .reset_index()
-    ) if "AE" in df_analytics.columns else pd.DataFrame()
-
-    # Pie: disposition mix
     pie = px.pie(
         g_disp,
         names="_Disposition",
@@ -343,10 +453,14 @@ else:
         hole=0.35,
         title=f"Disposition Mix — {metric}"
     )
-    st.plotly_chart(pie, width='stretch')
+    st.plotly_chart(pie, use_container_width=True)
 
-    # Stacked bar by AE
-    if not g_ae.empty:
+    if "AE" in df_analytics.columns:
+        g_ae = (
+            df_analytics.groupby(["AE", "_Disposition"], dropna=False)
+            .agg(Count=("Style", "size"), Amt=("_Amt", "sum"))
+            .reset_index()
+        )
         bar = px.bar(
             g_ae,
             x="AE",
@@ -355,22 +469,23 @@ else:
             barmode="stack",
             title=f"Dispositions by AE — {metric}"
         )
-        st.plotly_chart(bar, width='stretch')
+        st.plotly_chart(bar, use_container_width=True)
 
-    hide_unspecified_table = st.checkbox("Show Table of Items Requiring Disposition", value=False)
+    show_pending = st.checkbox("Show Table of Items Requiring Disposition", value=False)
     pending = df_analytics[df_analytics["_Disposition"] == "Unspecified"]
+
     if pending.empty:
-            st.success("All items have a disposition. ✅")
-    # Items needing attention
-    elif hide_unspecified_table:
+        st.success("All items have a disposition. ✅")
+    elif show_pending:
         st.markdown("#### Items Requiring Disposition")
-        cols_show = [c for c in ["AE", "Customer", "Style", "Style Description", "Open_Memo_Qty", "Open_Memo_Amt", "Inception Dt.", "RA_Issued"] if c in pending.columns]
-        st.dataframe(
-            pending[cols_show].style.format({
-                "Open_Memo_Qty": "{:,}" if "Open_Memo_Qty" in pending.columns else "{:}",
-                "Open_Memo_Amt": "${:,.2f}" if "Open_Memo_Amt" in pending.columns else "{:}",
-            })
-        )
+
+        cols_show = [c for c in [
+            "AE", "Customer", "Style", "Style Description",
+            "Open Memo Qty", "Open Memo Amt", "Inception Dt.", "RA_Issued"
+        ] if c in pending.columns]
+
+        st.dataframe(pending[cols_show], use_container_width=True)
+
         st.download_button(
             "📥 Download Unspecified Items (CSV)",
             data=pending[cols_show].to_csv(index=False),
@@ -378,147 +493,108 @@ else:
             mime="text/csv"
         )
 
+# ----------------------------
+# RA Activity
+# ----------------------------
 st.subheader("RA Activity")
 
-# Ensure datetime
-if "Date_RA_Issued" in df.columns:
-    df["Date_RA_Issued"] = pd.to_datetime(df["Date_RA_Issued"], errors="coerce")
-
-# Filter valid RA dates
-ra_df = df.loc[df["Date_RA_Issued"].notna()].copy()
-
-# KPIs
-c1, c2, c3 = st.columns(3)
-
-total_ras = len(ra_df)
-ras_30d = len(ra_df.loc[ra_df["Date_RA_Issued"] >= (pd.Timestamp.today().normalize() - pd.Timedelta(days=30))])
-
-c1.metric("Total RAs (dated)", f"{total_ras:,}")
-c2.metric("RAs last 30 days", f"{ras_30d:,}")
-
-# Optional: sum of open memo amount tied to RA (only if column exists + numeric)
-if "Open_Memo_Amt" in ra_df.columns:
-    c3.metric("Open Memo Value (RA styles)", f"${ra_df['Open_Memo_Amt'].sum():,.0f}")
+if "Date_RA_Issued" not in df_filtered.columns:
+    st.info("No Date_RA_Issued column available.")
 else:
-    c3.metric("Open Memo Value (RA styles)", "—")
+    ra_df = df_filtered.loc[df_filtered["Date_RA_Issued"].notna()].copy()
 
-# Chart controls
-granularity = st.radio("Granularity", ["Daily", "Monthly"], horizontal=True)
+    c1, c2, c3 = st.columns(3)
+    total_ras = len(ra_df)
+    ras_30d = len(ra_df.loc[ra_df["Date_RA_Issued"] >= (pd.Timestamp.today().normalize() - pd.Timedelta(days=30))])
 
+    c1.metric("Total RAs (dated)", f"{total_ras:,}")
+    c2.metric("RAs last 30 days", f"{ras_30d:,}")
 
-if total_ras == 0:
-    st.info("No valid RA dates found in Date_RA_Issued yet.")
-else:
-    if granularity == "Daily":
-        series = (
-            ra_df
-            .groupby(ra_df["Date_RA_Issued"].dt.date)
-            .agg(
-                RA_Count=("Date_RA_Issued", "size"),
-                RA_Value=("Open_Memo_Amt", "sum"),
+    if "Open Memo Amt" in ra_df.columns:
+        c3.metric("Open Memo Value (RA styles)", f"${ra_df['Open Memo Amt'].sum():,.0f}")
+    else:
+        c3.metric("Open Memo Value (RA styles)", "—")
+
+    granularity = st.radio("Granularity", ["Daily", "Monthly"], horizontal=True)
+
+    if total_ras == 0:
+        st.info("No valid RA dates found in Date_RA_Issued yet.")
+    else:
+        if granularity == "Daily":
+            series = (
+                ra_df
+                .groupby(ra_df["Date_RA_Issued"].dt.date)
+                .agg(
+                    RA_Count=("Date_RA_Issued", "size"),
+                    RA_Value=("Open Memo Amt", "sum") if "Open Memo Amt" in ra_df.columns else ("Date_RA_Issued", "size")
+                )
+                .reset_index()
+                .rename(columns={"Date_RA_Issued": "Date"})
             )
-            .reset_index()
-            .rename(columns={"Date_RA_Issued": "Date"})
-        )
-
-        fig = px.bar(
-            series,
-            x="Date",
-            y="RA_Count",
-            hover_data={
-                "RA_Count": True,
-                "RA_Value": ":$,.0f",   # money formatting
-                "Date": True
-            }
-        )
-
-        fig.update_layout(yaxis_title="RAs", xaxis_title="")
-
-        st.plotly_chart(fig)
-
-
-
-    else:  # Monthly
-        series = (
-            ra_df
-            .assign(Month=ra_df["Date_RA_Issued"].dt.to_period("M").dt.to_timestamp())
-            .groupby("Month")
-            .agg(
-                RA_Count=("Date_RA_Issued", "size"),
-                RA_Value=("Open_Memo_Amt", "sum")
+            fig = px.bar(
+                series,
+                x="Date",
+                y="RA_Count",
+                hover_data={"RA_Count": True, "RA_Value": ":$,.0f", "Date": True}
             )
-            .reset_index()
-        )
+            fig.update_layout(yaxis_title="RAs", xaxis_title="")
+            st.plotly_chart(fig, use_container_width=True)
 
-        fig = px.bar(
-            series,
-            x="Month",
-            y="RA_Count",
-            hover_data={
-                "RA_Count": True,
-                "RA_Value": ":$,.0f",
-                "Month": True
-            }
-        )
-
-        fig.update_layout(yaxis_title="RAs", xaxis_title="")
-
-        st.plotly_chart(fig)
-
-
-# === Simple export for edits (no extra cols, no dropdowns) ===
-st.subheader("📥 Export current view")
-
-# CSV download button
-csv_name = f"SlowMemo_filtered_{datetime.today().strftime('%Y-%m-%d')}.csv"
-st.download_button(
-    label="Download filtered CSV",
-    data=df_filtered.to_csv(index=False),
-    file_name=csv_name,
-    mime="text/csv"
-)
-
-# === Worklist (Disposition-only) ===
-st.subheader(" Worklist (Disposition-only)")
+        else:
+            series = (
+                ra_df
+                .assign(Month=ra_df["Date_RA_Issued"].dt.to_period("M").dt.to_timestamp())
+                .groupby("Month")
+                .agg(
+                    RA_Count=("Date_RA_Issued", "size"),
+                    RA_Value=("Open Memo Amt", "sum") if "Open Memo Amt" in ra_df.columns else ("Date_RA_Issued", "size")
+                )
+                .reset_index()
+            )
+            fig = px.bar(
+                series,
+                x="Month",
+                y="RA_Count",
+                hover_data={"RA_Count": True, "RA_Value": ":$,.0f", "Month": True}
+            )
+            fig.update_layout(yaxis_title="RAs", xaxis_title="")
+            st.plotly_chart(fig, use_container_width=True)
+# ----------------------------
+# Worklist (Disposition-only)
+# ----------------------------
+st.subheader("Worklist (Disposition-only)")
 
 work_cols_pref = [
-    "AE", "Customer", "Style","image_url", "Style Description",
+    "AE", "Customer", "Style", "image_url", "Style Description",
     "Inception Dt.", "RA_Issued", "Performance_Category",
     "Disposition", "Comments"
 ]
 work_cols = [c for c in work_cols_pref if c in df_filtered.columns]
 
-# Default: show unresolved first
-if "Disposition" in df_filtered.columns:
-    disp_norm = _normalize_disposition(df_filtered["Disposition"])
-    work_df = df_filtered.assign(_Disp=disp_norm).copy()
-    # Replace the "Show Unspecified first" logic with this:
-    hide_unspecified = st.checkbox("Hide Unspecified", value=False)
+work_df = df_filtered.copy()
+if "Disposition" in work_df.columns:
+    work_df["_Disp"] = normalize_disposition(work_df["Disposition"])
 
-    work_df = df_filtered.copy()
-    if "Disposition" in work_df.columns:
-        work_df["_Disp"] = _normalize_disposition(work_df["Disposition"])
-        if hide_unspecified:
-            hidden = int((work_df["_Disp"] == "Unspecified").sum())
-            work_df = work_df[work_df["_Disp"] != "Unspecified"]
-            st.caption(f"Filtered out {hidden:,} Unspecified rows.")
-        # Optional: keep a stable sort for review
-        sort_keys = [c for c in ["AE", "Customer", "Style"] if c in work_df.columns]
-        if sort_keys:
-            work_df = work_df.sort_values(by=sort_keys)
-else:
-    work_df = df_filtered.copy()
+hide_unspecified = st.checkbox("Hide Unspecified", value=False)
+
+if "Disposition" in work_df.columns and hide_unspecified:
+    hidden = int((work_df["_Disp"] == "Unspecified").sum())
+    work_df = work_df[work_df["_Disp"] != "Unspecified"]
+    st.caption(f"Filtered out {hidden:,} Unspecified rows.")
+
+sort_keys = [c for c in ["AE", "Customer", "Style"] if c in work_df.columns]
+if sort_keys:
+    work_df = work_df.sort_values(by=sort_keys)
 
 if work_cols:
     st.data_editor(
-    work_df[work_cols],
-    hide_index=True,
-    use_container_width=True,
-    column_config={
-        # Example: uncomment or add as needed
-        "image_url": st.column_config.ImageColumn("Image", width="medium")
-    },
-)
+        work_df[work_cols],
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "image_url": st.column_config.ImageColumn("Image", width="medium")
+        } if "image_url" in work_df.columns else None,
+    )
 
     st.download_button(
         "📥 Download Worklist (CSV)",
@@ -529,37 +605,15 @@ if work_cols:
 else:
     st.info("No disposition-related columns available to show in Worklist.")
 
+# ----------------------------
+# Export
+# ----------------------------
+st.subheader("📥 Export current view")
 
-# def build_disposition_template_legacy(df_in):
-#     """Legacy: creates Excel with Disposition dropdowns (not used now)."""
-#     from io import BytesIO
-#     from openpyxl import Workbook
-#     from openpyxl.utils.dataframe import dataframe_to_rows
-#     from openpyxl.worksheet.datavalidation import DataValidation
-
-#     df_out = df_in.copy()
-#     for col in ['Date_RA_Issued', 'Disposition', 'Comments']:
-#         if col not in df_out.columns:
-#             df_out[col] = ""
-
-#     wb = Workbook()
-#     ws = wb.active
-#     ws.title = "SlowMemoExport"
-#     for r in dataframe_to_rows(df_out, index=False, header=True):
-#         ws.append(r)
-
-#     if "Disposition" in df_out.columns:
-#         idx = list(df_out.columns).index("Disposition") + 1
-#         col_letter = ws.cell(row=1, column=idx).column_letter
-#         rng = f"{col_letter}2:{col_letter}{len(df_out)+1}"
-#         dv = DataValidation(
-#             type="list",
-#             formula1='"Perpetual memo,Hold on memo/Monitor,RTV - Closeout,RTV- Melt,Other"',
-#             allow_blank=True,
-#         )
-#         ws.add_data_validation(dv); dv.add(rng)
-
-#     buf = BytesIO(); wb.save(buf); buf.seek(0)
-#     return buf, f"SlowMemo_template_{datetime.today().strftime('%Y-%m-%d')}.xlsx"
-
-# (not called)
+csv_name = f"SlowMemo_filtered_{datetime.today().strftime('%Y-%m-%d')}.csv"
+st.download_button(
+    label="Download filtered CSV",
+    data=df_filtered.to_csv(index=False),
+    file_name=csv_name,
+    mime="text/csv"
+)
