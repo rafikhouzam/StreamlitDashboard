@@ -31,7 +31,7 @@ def load_memo():
 
 @st.cache_data(ttl=60)
 def fetch_memo_health():
-    url = f"https://api.anerijewels.com/memo/health"
+    url = f"https://api.anerijewels.com/api/memo/health"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
     r = requests.get(url, headers=headers, timeout=30)
     r.raise_for_status()
@@ -70,7 +70,7 @@ meta, df = fetch_memo(limit=5000)
 # Optional: show freshness (kept lightweight)
 try:
     health = fetch_memo_health()
-    st.caption(f"API rows: {health.get('rows')} | cache_age_seconds: {health.get('cache_age_seconds')} | etag: {health.get('etag')}")
+    st.caption(f"API rows: {health.get('rows')} | cache_age_seconds: {health.get('cache_age_seconds')}")
 except Exception:
     pass
 
