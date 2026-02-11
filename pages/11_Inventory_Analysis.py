@@ -34,24 +34,8 @@ def load_inventory(unit):
     res.raise_for_status()
     return pd.DataFrame(res.json())
 
-
-def load_local(unit):
-    if unit == "Sumit":
-        csv_path = st.secrets["LOCAL_INVENTORY_SUMIT_PATH"]
-    elif unit == "EDB":
-        csv_path = st.secrets["LOCAL_INVENTORY_EDB_PATH"]
-    elif unit == "Newlite":
-        csv_path = st.secrets["LOCAL_INVENTORY_NEWLITE_PATH"]
-    else:
-        st.write("Please select business unit to begin.")
-    return pd.read_csv(csv_path)
-
 try:
-    if use_local:
-        df = load_local(unit)
-    else:
-        df = load_inventory(unit)
-
+    df = load_inventory(unit)
 
 except Exception as e:
     st.error("❌ Failed to load data.")

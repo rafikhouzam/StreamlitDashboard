@@ -76,7 +76,7 @@ except Exception:
 
 #st.write(f"Snapshot: {payload['snapshot_date']} | Rows returned: {len(df)} | Total: {payload['total']}")
 #st.write(df.columns.tolist())
-st.dataframe(df, use_container_width=True)
+#st.dataframe(df, use_container_width=True)
 # ----------------------------
 # Apply runtime merge (Style-level)
 # ----------------------------
@@ -105,7 +105,7 @@ RENAME_MAP = {
 
     # sales
     "Net_Sales_2024": "Net Sales 2024",
-    "Net_Sales_2025_YTD": "Net Sales 2025 YTD",
+    "Net_Sales_2025": "Net Sales 2025",
     "Net_Sales_2026": "Net Sales 2026",
 
     # memo + performance
@@ -140,7 +140,7 @@ preferred_order = [
     "Shipped Qty 2024-25",
     "Returned Qty 2024-25",
     "Net Sales 2024",
-    "Net Sales 2025 YTD",
+    "Net Sales 2025",
     "Net Sales 2026",
     "Open Memo Qty",
     "Open Memo Amt",
@@ -171,7 +171,7 @@ qty_cols = [
     "Shipped Qty 2024-25",
     "Returned Qty 2024-25",
     "Net Sales 2024",
-    "Net Sales 2025 YTD",
+    "Net Sales 2025",
     "Net Sales 2026",
     "Open Memo Qty",
     "Expected Sales in next 6 months",
@@ -236,6 +236,11 @@ if "Date_RA_Issued" in df.columns:
 # ----------------------------
 st.sidebar.header("Filters")
 
+if "Div" in df.columns:
+    div_selected = st.sidebar.multiselect("Division(s)", sorted(df["Div"].dropna().unique().tolist()))
+    if div_selected:
+        df = df[df["Div"].isin(div_selected)]
+
 if "AE" in df.columns:
     ae_selected = st.sidebar.multiselect("Account Executive(s)", sorted(df["AE"].dropna().unique().tolist()))
     if ae_selected:
@@ -291,7 +296,7 @@ st.subheader("Detailed Memo Table (Sorted)")
 sort_columns = {
     "Open Memo Qty": "Open Memo Qty",
     "Open Memo Amt ($)": "Open Memo Amt",
-    "Net Sales 2025 YTD (Qty)": "Net Sales 2025 YTD",
+    "Net Sales 2025 (Qty)": "Net Sales 2025",
     "Excess (Qty)": "Excess",
     "Sell Through %": "Sell Through %"
 }
@@ -328,7 +333,7 @@ metric_cols = [
     "Shipped Qty 2024-25",
     "Returned Qty 2024-25",
     "Net Sales 2024",
-    "Net Sales 2025 YTD",
+    "Net Sales 2025",
     "Net Sales 2026",
     "Open Memo Qty",
     "Open Memo Amt",

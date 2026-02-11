@@ -12,9 +12,12 @@ st.sidebar.write(f"User — {user}")
 # ----- Catalog: path, title, allowed_roles (empty => everyone), icon (optional)
 page_roles = {
     "00_Signet_Sales.py": ["sales"],
+    "01_Customer_Sales_Analysis.py": ["admin"],
     "05_Ecommerce_Dashboard.py": ["sales"],
+    "06_Ecomm_Analysis_SQL.py": ["sales"],
     "10_Slow_Memo_Analysis.py": ["sales"],
     "11_Inventory_Analysis.py": ["admin"],
+    "12_Testing.py": ["admin"],
     "15_Stock_Aging.py": ["admin"],
     "20_Image_Lookup.py": [],
     "21_Image_Upload_Search.py": [],
@@ -23,9 +26,12 @@ page_roles = {
 # ----- Catalog: path, title, allowed_roles (empty => everyone), icon (optional)
 catalog = [
     ("pages/00_Signet_Sales.py",         "Signet Sales",            ["sales"],   "🧾"),
-    ("pages/05_Ecommerce_Dashboard.py",  "Ecommerce Dashboard",     ["sales"],   "📊"),
+    ("pages/01_Customer_Sales_Analysis.py","Customer Sales Analysis",  ["admin"],   "🪙"),
+    ("pages/05_Ecommerce_Dashboard.py",  "Ecommerce Dashboard",     ["admin"],   "📊"),
+    ("pages/06_Ecomm_Analysis_SQL.py",   "Ecommerce SQL Analysis",  ["admin"],   "🛒"),
     ("pages/10_Slow_Memo_Analysis.py",   "Slow Memo Analysis",      ["sales"],   "🐢"),
     ("pages/11_Inventory_Analysis.py",   "Inventory Analysis",      ["admin"],   "🛠️"),
+    ("pages/12_Testing.py",              "Testing",                 ["admin"],   "🔍"),
     ("pages/15_Stock_Aging.py",          "Stock Aging",             ["admin"],   "📦"),
     ("pages/20_Image_Lookup.py",         "Image Lookup",            [],          "🔎"),
     ("pages/21_Image_Upload_Search.py",  "Image Upload Search",     [],          "⬆️"),

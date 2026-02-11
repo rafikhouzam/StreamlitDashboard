@@ -6,6 +6,8 @@ import requests
 import plotly.express as px
 from utils.navbar import navbar
 from streamlit_auth import require_login
+import pyodbc
+from utils.db import get_sql_engine
 
 require_login()
 
@@ -29,16 +31,55 @@ def load_local():
     csv_path = st.secrets["LOCAL_ECOMM_PATH"]
     return pd.read_csv(csv_path)
 
+@st.cache_data(ttl=3600)
+def load_ecomm_sql():
+    engine = get_sql_engine()
+
+    sql = """
+    SELECT
+        company_id,
+        order_no,
+        order_dt,
+        customer_id,
+        customer_name AS customer,
+        style_cd,
+        sku_no,
+        so_size,
+        sales_qty,
+        sales_amt,
+        unit_price,
+        diamond_wt,
+        diamond_qlty
+    FROM dbo.vw_ecomm_sales_fact
+    WHERE company_id = 'DS02'
+      AND order_dt >= '2023-01-01'
+    """
+
+    df = pd.read_sql(sql, engine)
+
+    # enforce numeric safety
+    for col in ["sales_qty", "sales_amt", "unit_price", "diamond_wt"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    df["order_dt"] = pd.to_datetime(df["order_dt"])
+
+    return df
+
 try:
     use_local = st.secrets.get("USE_LOCAL_ECOMM_DATA", False)
-    df_master = load_local() if use_local else load_ecomm()
+    df_master = load_local() if use_local else load_ecomm_sql()
 except Exception as e:
-    st.error("❌ Failed to load updated data.")
+    st.error("❌ Failed to load e-commerce data.")
     st.text(f"Error: {e}")
     st.stop()
 
 # remove Ben Bridge data since its poor
 df_master = df_master[df_master["customer"] != "Ben Bridge"]
+# standardize naming so the rest of your page doesn't change
+if "customer_name" in df_master.columns and "customer" not in df_master.columns:
+    df_master["customer"] = df_master["customer_name"]
+
 
 # ---------------- Sidebar ----------------
 # Use the new dataset's customer names directly
