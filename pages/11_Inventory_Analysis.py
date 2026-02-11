@@ -27,11 +27,13 @@ unit = st.selectbox("Select Business Unit", ["Sumit", "EDB", "Newlite"])
 # Load dataset
 @st.cache_data
 def load_inventory(unit):
-    url = f"https://api.anerijewels.com/api/inventory?unit={unit.lower()}"
+    url = f"https://api.anerijewels.com/api/inventory/"
     headers = {"X-API-KEY": st.secrets["API_KEY"]}
-    res = requests.get(url, headers=headers)
+    params = {"unit": unit.lower(), "dataset": "analytics", "limit": 50000}
+    res = requests.get(url, headers=headers, params=params, timeout=120)
     res.raise_for_status()
     return pd.DataFrame(res.json())
+
 
 def load_local(unit):
     if unit == "Sumit":
@@ -56,30 +58,98 @@ except Exception as e:
     st.text(f"Error: {e}")
     st.stop()
 
+# =========================
+# Normalize to legacy column names expected by this page
+# =========================
+RENAME_MAP = {
+    "Style no.": "style_cd",
+    "Style Description": "style_desc",
+    "Jewelry Category": "style_category",
+    "Metal Type": "metal_typ",
+    "Vendor": "vendor_id",
+    "Selling Price": "selling_price",
+    "Current Cost": "total_cost",
+    "Last sold date": "last_sold_dt",
+    "Created on": "created_on",
+}
+
+# Apply renames where present
+df = df.rename(columns={k: v for k, v in RENAME_MAP.items() if k in df.columns})
+
+# Ensure key text columns are strings (prevents .str errors)
+for c in ["style_cd", "style_desc", "style_category", "metal_typ", "vendor_id"]:
+    if c in df.columns:
+        df[c] = df[c].astype(str).str.strip()
+
+# Department columns: map new unit columns -> legacy dept codes used by the dashboard
+DEPT_MAP = {
+    "Units in Repair": "REP",
+    "Units in CRET": "CRET",
+    "Units in QC": "QC",
+    "Units in RTS": "RTS",
+    "Units on Memo": "OM",
+}
+for src, dst in DEPT_MAP.items():
+    if src in df.columns and dst not in df.columns:
+        df[dst] = pd.to_numeric(df[src], errors="coerce").fillna(0)
+
+# Costs: map new cost columns -> legacy names used by downstream logic
+COST_MAP = {
+    "Metal Cost": "metal_cost",
+    "Diamond Cost": "diamond_cost",
+    "Labor Cost": "total_labor_cost",
+    "Duty Cost": "costfor_duty1",
+    # Finding Cost exists but is not used by your current page; keep if you want:
+    "Finding Cost": "finding_cost",
+}
+for src, dst in COST_MAP.items():
+    if src in df.columns and dst not in df.columns:
+        df[dst] = pd.to_numeric(df[src], errors="coerce")
+
+# Selling price / total cost numeric coercion
+for c in ["selling_price", "total_cost", "metal_cost", "diamond_cost", "total_labor_cost", "costfor_duty1", "finding_cost"]:
+    if c in df.columns:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+
+# Dates
+for c in ["last_sold_dt", "created_on"]:
+    if c in df.columns:
+        df[c] = pd.to_datetime(df[c], errors="coerce")
+
+# Optional: keep your existing "Days since last sold" under a legacy-friendly name if needed later
+if "Days since last sold" in df.columns and "days_since_last_sold" not in df.columns:
+    df["days_since_last_sold"] = pd.to_numeric(df["Days since last sold"], errors="coerce")
+
+# Image column for later (if you want to show it)
+if "Style Image" in df.columns and "image_url" not in df.columns:
+    df["image_url"] = df["Style Image"].astype(str).str.strip()
+
+# ECOMM to bool-ish
+if "ECOMM" in df.columns and "ecomm" not in df.columns:
+    df["ecomm"] = df["ECOMM"].astype(str).str.strip().str.upper().isin(["Y", "YES", "TRUE", "1"])
 
 # ----------------------
 # Helpers & Config
 # ----------------------
-DATE_COLS = ["update_dt", "price_update_dt", "style_dt", "approve_dt"]
+DATE_COLS = ["created_on", "last_sold_dt"]
 NUMERIC_COLS_CANDIDATES = [
-    "selling_price", "metal_cost", "diamond_cost", "overseas_diamond_cost",
-    "domestic_diamond_cost", "overseas_labor_cost", "domestic_labor_cost",
-    "total_labor_cost", "overseas_cost", "domestic_cost",
-    "melt_value", "purchase_price", "semimount_price", "semimount_cost",
-    "diamond_price", "gold_increment", "minimum_qty", "reorder_qty",
-    "gross_wt", "cstone_wt", "ctrstone_wt", "diamond_wt", "old_cost",
-    "total_metal_wt", "cs_size", "cstone_size",
-    "shape1_min", "shape1_max", "shape2_min", "shape2_max", "shape3_min", "shape3_max",
-    "center1_min", "center2_min", "center3_min",
+    "selling_price",
+    "total_cost",
+    "metal_cost",
+    "diamond_cost",
+    "total_labor_cost",
+    "finding_cost",
+    "costfor_duty1",
+    "Casting Weight (g)",   # optional if you want
+    "CTTW",                 # optional if you want
+    "days_since_last_sold",
+    "REP", "CRET", "QC", "RTS", "OM",
 ]
+
 LOCK_COLS = ["gold_lock", "silver_lock", "platinum_lock", "palladium_lock"]
 
 # Department columns relevant for quantity/value computation
-dept_cols = [
-    "CNTR", "CAST", "QC", "LAB", "INTR", 
-    "REP", "VNDR", "SCRP", "CRET",
-    "SCL", "RTS", "OM"
-]
+dept_cols = ["REP", "CRET", "QC", "RTS", "OM"]
 
 def coerce_numeric(df: pd.DataFrame, columns):
     for c in columns:
@@ -188,10 +258,45 @@ cost_cols_core = [
     "diamond_cost",
     "total_labor_cost",
     "costfor_duty1",
-    "other_cost",
-    "cstone_cost",
-    "costfor_duty2",
+    "finding_cost",
 ]
+
+dept_cols_valid = [c for c in dept_cols if c in filtered.columns]
+money_cols = ["On hand $", "On memo $", "RTS $"]
+
+# Coerce dept quantities
+for c in dept_cols_valid:
+    filtered[c] = pd.to_numeric(filtered[c], errors="coerce").fillna(0)
+
+# Coerce dollar columns
+for c in money_cols:
+    if c in filtered.columns:
+        filtered[c] = pd.to_numeric(filtered[c], errors="coerce").fillna(0)
+
+# "Operational quantity" (for filtering / pipeline visibility) — keep as SUM if you want
+# This is NOT used for valuation anymore.
+active_deps_for_qty = [d for d in sel_deps if d in dept_cols_valid]
+if not active_deps_for_qty:
+    active_deps_for_qty = dept_cols_valid
+
+filtered["total_quantity"] = filtered[active_deps_for_qty].sum(axis=1)
+
+# Value = authoritative dollars (no double counting)
+filtered["total_value"] = 0
+if "On hand $" in filtered.columns:
+    filtered["total_value"] += filtered["On hand $"]
+if "On memo $" in filtered.columns:
+    filtered["total_value"] += filtered["On memo $"]
+if "RTS $" in filtered.columns:
+    filtered["total_value"] += filtered["RTS $"]
+
+# Cost per piece (optional, for KPIs)
+# Use Current Cost if present
+if "Current Cost" in filtered.columns:
+    filtered["Current Cost"] = pd.to_numeric(filtered["Current Cost"], errors="coerce")
+    filtered["component_sum"] = filtered["Current Cost"]
+else:
+    filtered["component_sum"] = np.nan
 
 # --- Coerce numeric ---
 filtered[dept_cols_valid] = filtered[dept_cols_valid].apply(pd.to_numeric, errors="coerce").fillna(0)
@@ -215,12 +320,10 @@ filtered["component_sum"] = (
     + filtered["diamond_cost"]
     + filtered["total_labor_cost"]
     + filtered["costfor_duty1"]
-    + filtered["other_cost"]
-    + filtered["cstone_cost"]
+    + filtered["finding_cost"]
 )
 
 filtered["total_value"] = filtered["component_sum"] * filtered["total_quantity"]
-filtered["diaspark_value"] = filtered["costfor_duty2"] * filtered["total_quantity"]
 
 
 # --- KPI Cards ---
