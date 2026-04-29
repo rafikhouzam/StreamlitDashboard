@@ -15,7 +15,7 @@ Key pillars:
 - **Inventory and product management** views connected directly to the company database
 - **CLIP-powered visual search** across 18,000+ clean product images
 - **Image tagging pipeline** for building ML-ready datasets
-- **Fully deployed** on AWS EC2 + CloudFront, used daily by internal teams
+- **Fully deployed** on AWS EC2, used daily by internal teams
 
 ---
 
@@ -70,7 +70,7 @@ Key pillars:
 | **Frontend** | Streamlit multipage app |
 | **Backend** | FastAPI microservices |
 | **Data Automation** | SQL stored procedures, SQL Server Agent, cron (Linux), Python sync scripts |
-| **Infrastructure** | AWS EC2, S3, CloudFront, Linux (systemd) |
+| **Infrastructure** | AWS EC2, S3, Linux (systemd) |
 | **ML / Search** | OpenAI CLIP, FAISS vector index |
 | **Auth** | Role-based session auth (Streamlit) |
 | **Data** | Pandas, NumPy, regex pipelines, CSV + SQL |
@@ -98,7 +98,7 @@ Key pillars:
 
 ## 🏁 Status
 
-✅ **Live in production** (EC2 + CloudFront)  
+✅ **Live in production** (EC2)  
 ✅ **Used daily** by internal operations and QA teams  
 ✅ **18,000+ tagged and searchable product images**  
 ✅ **Fully automated data refresh** — no manual exports or updates  
